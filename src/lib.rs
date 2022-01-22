@@ -121,9 +121,6 @@ pub enum PaaError {
 
 	/// Attempted to write a PAA image with more than 16 mipmaps.
 	TooManyMipmaps(#[error(ignore)] usize),
-
-	/// Attempted to read a PAA image without a [`Tagg::Offs`].
-	OffsTaggNotFound,
 }
 
 
