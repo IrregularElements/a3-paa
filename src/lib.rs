@@ -100,7 +100,7 @@ pub enum PaaError {
 
 	/// The [`PaaImage`] passed to [`PaaImage::to_bytes`] contained a
 	/// [fallible][`PaaMipmapContainer::Fallible`] container variant.
-	MipmapErrorDuringEncoding,
+	FallibleMipmapInput,
 
 	/// A checked arithmetic operation triggered an unexpected under/overflow.
 	CorruptedData,
@@ -306,7 +306,7 @@ impl PaaImage {
 			Ok(mipmaps)
 		}
 		else {
-			Err(MipmapErrorDuringEncoding)
+			Err(FallibleMipmapInput)
 		}?;
 
 		let mipmap_blocks = mipmaps
