@@ -843,7 +843,7 @@ impl PaaMipmap {
 		let non_power_of_2 = self.width.count_ones() > 1 || self.height.count_ones() > 1;
 		let too_small = self.width < 4 || self.height < 4;
 
-		if non_power_of_2 || too_small {
+		if self.paatype.is_dxtn() && (non_power_of_2 || too_small) {
 			return Err(UnexpectedMipmapDimensions);
 		}
 
