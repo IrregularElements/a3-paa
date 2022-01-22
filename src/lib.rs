@@ -264,6 +264,12 @@ impl PaaImage {
 	}
 
 
+	pub fn from_bytes(input: &[u8]) -> PaaResult<Self> {
+		let mut cursor = Cursor::new(input);
+		Self::read_from(&mut cursor)
+	}
+
+
 	/// Ignores input Taggs::Offs and regenerates offsets based on actual mipmap
 	/// data.
 	pub fn to_bytes(&self) -> PaaResult<Vec<u8>> {
