@@ -98,6 +98,13 @@ pub enum PaaError {
 	/// Mipmap dimensions not multiple of 2 or less than 4.
 	UnexpectedMipmapDimensions,
 
+	/// Uncompressed mipmap data is not of the same size as computed by
+	/// [`PaaType::predict_size`].  Enum members are width, height and
+	/// [`predict_size`][PaaType::predict_size] result.
+	#[error(ignore)]
+	#[display(fmt = "UnexpectedMipmapDataSize({}, {}, {})", _0, _1, _2)]
+	UnexpectedMipmapDataSize(u16, u16, usize),
+
 	/// The [`PaaImage`] passed to [`PaaImage::to_bytes`] contained a
 	/// [fallible][`PaaMipmapContainer::Fallible`] container variant.
 	FallibleMipmapInput,
@@ -877,6 +884,10 @@ impl PaaMipmap {
 
 		let mut width = self.width;
 		let mut height = self.height;
+
+	   if self.paatype.predict_size(width, height) != self.data.len() {
+		   return Err(UnexpectedMipmapDataSize(width, height, self.data.len()));
+	   }
 
 		if let (Lzss, IndexPalette) = (&self.compression, &self.paatype) && !self.is_empty() {
 			width = 1234;
