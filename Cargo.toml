@@ -9,21 +9,21 @@ rust-version = "1.56"
 default = ["image"]
 
 [dependencies]
-static_assertions = "1.1"
-derive_more = "0.99"
-byteorder = "1.4"
-bstr = "0.2"
-segvec = "0.1"
-libc = "0.2"
-minilzo-rs = "0.6"
-log = "0.4"
-image = { version = "0.23", optional = true }
+static_assertions = "1.1.0"
+derive_more = "0.99.17"
+byteorder = "1.4.3"
+bstr = "0.2.17"
+segvec = "0.1.5"
+libc = "0.2.117"
+minilzo-rs = "0.6.0"
+log = "0.4.14"
+image = { version = "0.23.14", optional = true }
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
 rev = "18cfdedfa530ea4d5468154a1c2210445bd751e2"
 
 [dev-dependencies]
-fern = "0.5"
-chrono = "0.4"
+fern = "0.5.9"
+chrono = "0.4.19"
 
