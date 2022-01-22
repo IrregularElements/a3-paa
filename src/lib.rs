@@ -145,7 +145,7 @@ macro_rules! debug_trace {
 /// the most obvious idiom is to [collect][PaaMipmapContainer::into_infallible]
 /// inner vector of [`Fallible`][`PaaMipmapContainer::Infallible`] as
 /// `PaaResult<Vec<PaaMipmap>>`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PaaMipmapContainer {
 	Fallible(Vec<PaaResult<PaaMipmap>>),
 	Infallible(Vec<PaaMipmap>),
@@ -200,7 +200,7 @@ impl PaaMipmapContainer {
 }
 
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct PaaImage {
 	pub paatype: PaaType,
 	pub taggs:   Vec<Tagg>,
@@ -730,7 +730,7 @@ impl From<&Transparency> for u8 {
 }
 
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct PaaPalette {
 	pub triplets: Vec<[u8; 3]>,
 }
