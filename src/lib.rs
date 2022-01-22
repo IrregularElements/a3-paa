@@ -232,10 +232,9 @@ impl PaaImage {
 			}
 		}
 
-		let mut palette_data = [0u8; 2];
-		input.read_exact(&mut palette_data).map_err(|e| UnexpectedEof(e.kind()))?;
+		let palette = PaaPalette::read_from(input)?;
 
-		if palette_data != [0x00, 0x00] {
+		if palette.is_some() {
 			return Err(UnknownPaaType(PaaType::PAXTYPE_IPAL_BYTES));
 		}
 
@@ -257,7 +256,7 @@ impl PaaImage {
 				.collect::<Vec<PaaResult<PaaMipmap>>>()
 		};
 
-		let image = PaaImage { paatype, taggs, offsets: offs, palette: None, mipmaps: PaaMipmapContainer::Fallible(mipmaps) };
+		let image = PaaImage { paatype, taggs, offsets: offs, palette, mipmaps: PaaMipmapContainer::Fallible(mipmaps) };
 
 		Ok(image)
 	}
@@ -723,6 +722,26 @@ impl PaaPalette {
 		}
 
 		Ok(buf)
+	}
+
+
+	/// Returns `Ok(None)` if palette is empty, `Ok(Self)` otherwise.
+	pub fn read_from<R: Read>(input: &mut R) -> PaaResult<Option<Self>> {
+		const_assert!(std::mem::size_of::<usize>() >= 2);
+
+		let len = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))? as usize;
+		let mut triplets: Vec<[u8; 3]> = Vec::with_capacity(len);
+
+		if len == 0 {
+			return Ok(None);
+		};
+
+		for i in 0..len {
+			let buf: [u8; 3] = read_exact_buffered(input, 3)?.try_into().expect("Could not convert buf (this is a bug)");
+			triplets.insert(i, buf);
+		};
+
+		Ok(Some(Self { triplets }))
 	}
 }
 
