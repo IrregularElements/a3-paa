@@ -31,12 +31,13 @@
 
 
 use std::fmt::Debug;
-use std::io::{Read, Seek, SeekFrom, Cursor, ErrorKind};
+use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
 use static_assertions::const_assert;
 use bstr::BString;
+use segvec::SegVec;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use derive_more::{Display, Error};
 
@@ -186,8 +187,7 @@ impl PaaImage {
 		let stream_len = input.stream_len().map_err(|e| UnexpectedEof(e.kind()))?;
 
 		// [TODO] Index palette support
-		let mut paatype_bytes = [0u8; 2];
-		input.read_exact(&mut paatype_bytes).map_err(|e| UnexpectedEof(e.kind()))?;
+		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?.try_into().expect("Could not convert paatype_bytes (this is a bug)");
 		let paatype = PaaType::from_bytes(&paatype_bytes)
 			.ok_or(UnknownPaaType(paatype_bytes))?;
 
@@ -207,8 +207,7 @@ impl PaaImage {
 
 			match tagghead {
 				Ok((taggtype, payload_length)) => {
-					let mut data = vec![0u8; payload_length as usize];
-					input.read_exact(&mut data[..]).map_err(|e| UnexpectedEof(e.kind()))?;
+					let data = read_exact_buffered(input, payload_length as usize)?;
 					let tagg = Tagg::from_name_and_payload(&*taggtype, &data[..])?;
 
 					if let Tagg::Offs { ref offsets } = &tagg {
@@ -546,8 +545,9 @@ impl Tagg {
 	/// Tagg metadata: "TAGG" signature, tag name, and payload length.
 	/// Returns PaaResult<(name: String, payload_size: u32)>.
 	pub fn read_head_from<R: Read>(input: &mut R) -> PaaResult<(String, u32)> {
-		let mut tagghead = [0u8; 12];
-		input.read_exact(&mut tagghead).map_err(|e| UnexpectedEof(e.kind()))?;
+		let tagghead: [u8; 12] = read_exact_buffered(input, 12)?
+			.try_into()
+			.expect("Could not convert tagghead (this is a bug)");
 
 		let taggsig = &tagghead[0..4];
 
@@ -780,8 +780,7 @@ impl PaaMipmap {
 			compression = Lzss;
 		}
 
-		let mut compressed_data_buf: Vec<u8> = vec![0; data_compressed_len];
-		input.read_exact(&mut compressed_data_buf).map_err(|e| UnexpectedEof(e.kind()))?;
+		let compressed_data_buf: Vec<u8> = read_exact_buffered(input, data_compressed_len)?;
 
 		let data: Vec<u8> = match compression {
 			Uncompressed => {
@@ -1094,6 +1093,27 @@ fn test_extend_with_uint() {
 }
 
 
+pub fn read_exact_buffered<R: Read>(input: &mut R, len: usize) -> PaaResult<Vec<u8>> {
+	const SINGLE_READ_SIZE: usize = 64;
+	let mut data: SegVec<u8> = SegVec::new();
+	let mut total = 0usize;
+
+	loop {
+		if total == len {
+			break;
+		};
+
+		let bufsize = std::cmp::min(SINGLE_READ_SIZE, len-total);
+		let mut buf = vec![0u8; bufsize];
+		input.read_exact(&mut buf).map_err(|e| UnexpectedEof(e.kind()))?;
+		data.extend(&buf[..]);
+		total += bufsize;
+	}
+
+	Ok(data.into_iter().collect::<Vec<u8>>())
+}
+
+
 pub fn get_additive_i32_cksum(input: &[u8]) -> i32 {
 	input.iter().fold(0i32, |a, b| { a.wrapping_add(*b as i32) })
 }
@@ -1125,9 +1145,7 @@ pub fn decompress_rleblock_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 		}
 		else {
 			let n = flag + 1;
-			let mut data = vec![0u8; n as usize];
-			cursor.read_exact(&mut data).map_err(|_| UnexpectedEof(ErrorKind::UnexpectedEof))?;
-			data
+			read_exact_buffered(&mut cursor, n as usize)?
 		};
 
 		buf.extend(data);
