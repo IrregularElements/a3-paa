@@ -124,11 +124,17 @@ pub enum PaaError {
 
 
 macro_rules! debug_trace {
-	($($arg : tt) *) => {
+	($fmt:expr) => {
 		if cfg!(debug_assertions) {
-			log::trace!($($arg)*);
+			log::trace!(concat!("debug_trace: ", $fmt));
 		};
-	}
+	};
+
+	($fmt:expr, $($arg:tt)*) => {
+		if cfg!(debug_assertions) {
+			log::trace!(concat!("debug_trace: ", $fmt), $($arg)*);
+		};
+	};
 }
 
 
