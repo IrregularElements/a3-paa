@@ -3,6 +3,7 @@ edition = "2021"
 name = "a3-paa"
 version = "0.0.1-dev"
 description = "Read and write the Bohemia Interactive PAA image format"
+rust-version = "1.56"
 
 [features]
 default = ["image"]
@@ -26,5 +27,3 @@ rev = "18cfdedfa530ea4d5468154a1c2210445bd751e2"
 fern = "0.5"
 chrono = "0.4"
 
-[package.metadata]
-msrv = "1.56.0"
