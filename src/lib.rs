@@ -941,7 +941,7 @@ impl PaaMipmap {
 
 
 /// The algorithm compressing the data of a given mipmap.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PaaMipmapCompression {
 	Uncompressed,
 
