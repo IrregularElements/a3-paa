@@ -72,7 +72,7 @@ pub enum PaaError {
 	UnexpectedTaggDataSize,
 
 	/// Attempted to read a [`Tagg::Flag`] with unexpected transparency value.
-	UnknownTransparencyValue(#[error(ignore)] u32),
+	UnknownTransparencyValue(#[error(ignore)] u8),
 
 	/// [`PaaPalette::to_bytes`] received a palette with number of colors
 	/// overflowing a [`u16`][`std::primitive::u16`].
@@ -492,9 +492,8 @@ impl Tagg {
 
 			Self::Flag { transparency } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, U32_SIZE);
-
-				let trans = <u32 as From<&Transparency>>::from(transparency);
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, trans);
+				let trans = <u8 as From<&Transparency>>::from(transparency);
+				bytes.extend([trans, 0, 0, 0]);
 			},
 
 			Self::Swiz { swizzle } => {
@@ -581,9 +580,11 @@ impl Tagg {
 				if data.len() != 4 {
 					return Err(UnexpectedTaggDataSize);
 				}
-				let transparency = LittleEndian::read_u32(data);
-				let transparency: Transparency = transparency.try_into()
-					.map_err(|_| UnknownTransparencyValue(transparency))?;
+
+				let trans = data[0];
+				let transparency: Transparency = trans.try_into()
+					.map_err(|_| UnknownTransparencyValue(trans))?;
+
 				Ok(Self::Flag { transparency })
 			},
 
@@ -655,10 +656,10 @@ pub enum Transparency {
 }
 
 
-impl TryFrom<u32> for Transparency {
+impl TryFrom<u8> for Transparency {
 	type Error = ();
 
-	fn try_from(value: u32) -> Result<Self, Self::Error> {
+	fn try_from(value: u8) -> Result<Self, Self::Error> {
 		use Transparency::*;
 
 		match value {
@@ -671,7 +672,7 @@ impl TryFrom<u32> for Transparency {
 }
 
 
-impl From<&Transparency> for u32 {
+impl From<&Transparency> for u8 {
 	fn from(value: &Transparency) -> Self {
 		match value {
 			Transparency::None => 0,
