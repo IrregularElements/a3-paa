@@ -28,4 +28,8 @@ rev = "18cfdedfa530ea4d5468154a1c2210445bd751e2"
 [dev-dependencies]
 fern = "0.5.9"
 chrono = "0.4.19"
+clap = { version = "3.1.1", features = ["cargo"] }
 
+[[example]]
+name = "paatool"
+required-features = ["image", "clap/cargo"]
