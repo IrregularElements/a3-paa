@@ -23,12 +23,7 @@
 #![allow(deprecated)]
 
 
-//! This crate provides methods for reading and writing the Bohemia Interactive
-//! PAA (PAX) image format.  The main source of information on PAA is the [Biki],
-//! which is complemented by the [PMC Editing Wiki].
-//!
-//! [Biki]: https://community.bistudio.com/wiki/PAA_File_Format
-//! [PMC Editing Wiki]: https://pmc.editing.wiki/doku.php?id=arma:file_formats:paa
+#![doc = include_str!("../README.md")]
 
 
 use std::fmt::Debug;
