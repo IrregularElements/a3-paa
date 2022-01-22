@@ -333,6 +333,16 @@ impl PaaImage {
 
 		Ok(buf)
 	}
+
+
+	pub fn into_infallible(self) -> PaaResult<Self> {
+		let img = Self {
+			mipmaps: PaaMipmapContainer::Infallible(self.mipmaps.collect()?),
+			..self
+		};
+
+		Ok(img)
+	}
 }
 
 
