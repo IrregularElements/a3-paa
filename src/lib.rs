@@ -427,16 +427,16 @@ pub enum PaaType {
 	Dxt5,
 
 	/// RGBA 4:4:4:4
-	Rgba4,
+	Argb4444,
 
 	/// RGBA 5:5:5:1
-	Rgba5,
+	Argb1555,
 
 	/// RGBA 8:8:8:8
-	Rgba8,
+	Argb8888,
 
 	/// 8 bits alpha, 8 bits grayscale
-	Gray,
+	Ai88,
 
 	/// 1 byte (offset into the index palette, which contains BGR 8:8:8)
 	#[deprecated = "[TODO] Index palette format is not implemented"]
@@ -472,10 +472,10 @@ impl PaaType {
 			Self::PAXTYPE_DXT3_BYTES => Some(Self::Dxt3),
 			Self::PAXTYPE_DXT4_BYTES => Some(Self::Dxt4),
 			Self::PAXTYPE_DXT5_BYTES => Some(Self::Dxt5),
-			Self::PAXTYPE_RGB4_BYTES => Some(Self::Rgba4),
-			Self::PAXTYPE_RGB5_BYTES => Some(Self::Rgba5),
-			Self::PAXTYPE_RGB8_BYTES => Some(Self::Rgba8),
-			Self::PAXTYPE_GRAY_BYTES => Some(Self::Gray),
+			Self::PAXTYPE_RGB4_BYTES => Some(Self::Argb4444),
+			Self::PAXTYPE_RGB5_BYTES => Some(Self::Argb1555),
+			Self::PAXTYPE_RGB8_BYTES => Some(Self::Argb8888),
+			Self::PAXTYPE_GRAY_BYTES => Some(Self::Ai88),
 			Self::PAXTYPE_IPAL_BYTES => Some(Self::IndexPalette),
 			_ => None,
 		}
@@ -491,10 +491,10 @@ impl PaaType {
 			Dxt3 => Self::PAXTYPE_DXT3_BYTES,
 			Dxt4 => Self::PAXTYPE_DXT4_BYTES,
 			Dxt5 => Self::PAXTYPE_DXT5_BYTES,
-			Rgba4 => Self::PAXTYPE_RGB4_BYTES,
-			Rgba5 => Self::PAXTYPE_RGB5_BYTES,
-			Rgba8 => Self::PAXTYPE_RGB8_BYTES,
-			Gray => Self::PAXTYPE_GRAY_BYTES,
+			Argb4444 => Self::PAXTYPE_RGB4_BYTES,
+			Argb1555 => Self::PAXTYPE_RGB5_BYTES,
+			Argb8888 => Self::PAXTYPE_RGB8_BYTES,
+			Ai88 => Self::PAXTYPE_GRAY_BYTES,
 			IndexPalette => Self::PAXTYPE_IPAL_BYTES,
 		}
 	}
@@ -510,8 +510,8 @@ impl PaaType {
 		match self {
 			Dxt1 => { result /= 2 },
 			IndexPalette | Dxt2 | Dxt3 | Dxt4 | Dxt5 => (),
-			Rgba4 | Rgba5 | Gray => { result *= 2 },
-			Rgba8 => { result *= 4 },
+			Argb4444 | Argb1555 | Ai88 => { result *= 2 },
+			Argb8888 => { result *= 4 },
 		}
 
 		result

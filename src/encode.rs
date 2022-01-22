@@ -67,19 +67,19 @@ fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<DynamicImage> {
 			Ok(DynamicImage::ImageRgba8(image))
 		},
 
-		Rgba4 => {
+		Argb4444 => {
 			let data = argb4444_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
 			Ok(DynamicImage::ImageRgba8(image))
 		},
 
-		Rgba5 => {
+		Argb1555 => {
 			let data = argb1555_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
 			Ok(DynamicImage::ImageRgba8(image))
 		},
 
-		Rgba8 => {
+		Argb8888 => {
 			let data = argb8888_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
 			Ok(DynamicImage::ImageRgba8(image))

@@ -17,10 +17,10 @@ pub enum PaaTypeFuzzer {
 	Dxt3,
 	Dxt4,
 	Dxt5,
-	Rgba4,
-	Rgba5,
-	Rgba8,
-	Gray,
+	Argb4444,
+	Argb1555,
+	Argb8888,
+	Ai88,
 	IndexPalette,
 }
 
@@ -33,10 +33,10 @@ impl From<&PaaTypeFuzzer> for PaaType {
 			Dxt3 => PaaType::Dxt3,
 			Dxt4 => PaaType::Dxt4,
 			Dxt5 => PaaType::Dxt5,
-			Rgba4 => PaaType::Rgba4,
-			Rgba5 => PaaType::Rgba5,
-			Rgba8 => PaaType::Rgba8,
-			Gray => PaaType::Gray,
+			Argb4444 => PaaType::Argb4444,
+			Argb1555 => PaaType::Argb1555,
+			Argb8888 => PaaType::Argb8888,
+			Ai88 => PaaType::Ai88,
 			IndexPalette => PaaType::IndexPalette,
 		}
 	}
