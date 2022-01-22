@@ -5,7 +5,7 @@
 // [TODO]
 // ======
 // - Add index palette support
-// - Fix LZSS: it's underflowing or overflowing on decompression; looks like an incorrect algorithm
+// - Fix LZO: re-compressed data is different
 // - Add RLE compression
 // - Add image-rs decoding/encoding via PaaDecoder / PaaEncoder
 // - Describe PAA in module-level documentation
@@ -13,9 +13,18 @@
 
 
 #![allow(deprecated)]
+#![cfg_attr(doc, feature(doc_cfg))]
 
 
 #![doc = include_str!("../README.md")]
+
+
+#[cfg(feature = "encode")]
+mod pixconv;
+#[cfg(feature = "encode")]
+mod encode;
+#[cfg(feature = "encode")]
+pub use crate::encode::*;
 
 
 use std::fmt::Debug;
@@ -44,8 +53,10 @@ pub type PaaResult<T> = std::result::Result<T, PaaError>;
 #[derive(Debug, Display, Error, Clone)]
 pub enum PaaError {
 	/// A function that reads from [`std::io::Read`] encountered early EOF.
-	#[display(fmt = "UnexpectedEof({:?})", _0)]
-	UnexpectedEof(#[error(ignore)] std::io::ErrorKind),
+	UnexpectedEof,
+
+	#[display(fmt = "UnexpectedIoError({:?})", _0)]
+	UnexpectedIoError(#[error(ignore)] std::io::ErrorKind),
 
 	/// Attempted to read a PAA image with incorrect magic bytes.
 	#[display(fmt = "UnknownPaaType({:?})", _0)]
@@ -120,6 +131,23 @@ pub enum PaaError {
 
 	/// Attempted to write a PAA image with more than 16 mipmaps.
 	TooManyMipmaps(#[error(ignore)] usize),
+
+	MipmapIndexOutOfRange,
+}
+
+
+impl From<std::io::Error> for PaaError {
+	fn from(error: std::io::Error) -> Self {
+		match error.kind() {
+			std::io::ErrorKind::UnexpectedEof => {
+				UnexpectedEof
+			},
+
+			kind => {
+				UnexpectedIoError(kind)
+			},
+		}
+	}
 }
 
 
@@ -213,7 +241,9 @@ pub struct PaaImage {
 impl PaaImage {
 	pub fn read_from<R: Read + Seek>(input: &mut R) -> PaaResult<Self> {
 		// [TODO] Index palette support
-		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?.try_into().expect("Could not convert paatype_bytes (this is a bug)");
+		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?
+			.try_into()
+			.expect("Could not convert paatype_bytes (this is a bug)");
 		let paatype = PaaType::from_bytes(&paatype_bytes)
 			.ok_or(UnknownPaaType(paatype_bytes))?;
 
@@ -229,7 +259,7 @@ impl PaaImage {
 			debug_trace!("Seek position: {:?}", stream_position);
 
 			let mut tagghead_data = [0u8; 12];
-			input.read_exact(&mut tagghead_data).map_err(|e| UnexpectedEof(e.kind()))?;
+			input.read_exact(&mut tagghead_data)?;
 
 			let tagghead = Tagg::try_head_from(&tagghead_data);
 			debug_trace!("TAGG head: {:?}", tagghead);
@@ -276,7 +306,15 @@ impl PaaImage {
 			offs.iter().enumerate().map(|(_idx, offset)| {
 				let _ = (*offset).checked_add(4).ok_or(CorruptedData)?;
 
-				input.seek(SeekFrom::Start(*offset as u64)).unwrap();
+				input.seek(SeekFrom::Start(*offset as u64)).map_err(|e| {
+					match e.kind() {
+						std::io::ErrorKind::UnexpectedEof => {
+							MipmapOffsetBeyondEof
+						},
+
+						e => UnexpectedIoError(e)
+					}
+				})?;
 
 				PaaMipmap::read_from(input, paatype)
 			})
@@ -547,7 +585,7 @@ impl Tagg {
 			},
 
 			Self::Proc { text } => {
-				let len = (&text[..]).len() as u32;
+				let len = (text[..]).len() as u32;
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, len);
 				bytes.extend(&text[..]);
 			},
@@ -582,7 +620,7 @@ impl Tagg {
 		}
 
 		let taggname: String = std::str::from_utf8(&data[4..8])
-			.map_err(|_| UnknownTaggType((&data[4..8]).try_into().unwrap()))?
+			.map_err(|_| UnknownTaggType((data[4..8]).try_into().unwrap()))?
 			.into();
 
 		if ! Self::is_valid_taggname(&taggname) {
@@ -761,7 +799,7 @@ impl PaaPalette {
 	pub fn read_from<R: Read>(input: &mut R) -> PaaResult<Option<Self>> {
 		const_assert!(std::mem::size_of::<usize>() >= 2);
 
-		let len = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))? as usize;
+		let len = input.read_u16::<LittleEndian>()? as usize;
 		let mut triplets: Vec<[u8; 3]> = Vec::with_capacity(len);
 
 		if len == 0 {
@@ -798,8 +836,8 @@ impl PaaMipmap {
 		let mut paatype = paatype;
 		let mut compression = PaaMipmapCompression::Uncompressed;
 
-		let mut width = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))?;
-		let mut height = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))?;
+		let mut width = input.read_u16::<LittleEndian>()?;
+		let mut height = input.read_u16::<LittleEndian>()?;
 
 		if width == 0 || height == 0 {
 			return Err(EmptyMipmap);
@@ -809,8 +847,8 @@ impl PaaMipmap {
 			paatype = PaaType::IndexPalette;
 			compression = PaaMipmapCompression::Lzss;
 
-			width = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))?;
-			height = input.read_u16::<LittleEndian>().map_err(|e| UnexpectedEof(e.kind()))?;
+			width = input.read_u16::<LittleEndian>()?;
+			height = input.read_u16::<LittleEndian>()?;
 		}
 
 		if width & 0x8000 != 0 && paatype.is_dxtn() {
@@ -820,8 +858,7 @@ impl PaaMipmap {
 
 		const_assert!(std::mem::size_of::<usize>() >= 3);
 		let data_len = paatype.predict_size(width, height);
-		let data_compressed_len = input.read_uint::<LittleEndian>(3)
-			.map_err(|e| UnexpectedEof(e.kind()))? as usize;
+		let data_compressed_len = input.read_uint::<LittleEndian>(3)? as usize;
 
 		if matches!(paatype, IndexPalette) && !matches!(compression, Lzss) {
 			compression = RleBlocks;
@@ -845,12 +882,17 @@ impl PaaMipmap {
 				let split_pos = compressed_data_buf.len().checked_sub(4).ok_or(CorruptedData)?;
 				let (lzss_slice, checksum_slice) = compressed_data_buf.split_at(split_pos);
 				let checksum = LittleEndian::read_i32(checksum_slice);
-				let uncompressed_data = decompress_lzss_slice(lzss_slice, data_len)?;
+				let uncompressed_data = LzssReader::new().filter_slice_to_vec(lzss_slice).unwrap();
+
+				if uncompressed_data.len() != data_len {
+					return Err(LzssDecompressError);
+				};
 
 				let calculated_checksum = get_additive_i32_cksum(&uncompressed_data);
 
 				if calculated_checksum != checksum {
 					// [FIXME] keeps firing
+					//debug_trace!("calculated_checksum != checksum: 0x{:08X} vs 0x{:08X}", calculated_checksum, checksum);
 					//return Err(LzssWrongChecksum);
 				}
 
@@ -858,7 +900,7 @@ impl PaaMipmap {
 			},
 
 			RleBlocks => {
-				decompress_rleblock_slice(&compressed_data_buf[..])?
+				RleReader::new().filter_slice_to_vec(&compressed_data_buf[..]).map_err(RleError)?
 			},
 		};
 
@@ -881,7 +923,7 @@ impl PaaMipmap {
 
 		loop {
 			let mip = PaaMipmap::read_from(input, paatype);
-			let is_eof = matches!(mip, Err(MipmapDataBeyondEof) | Err(EmptyMipmap) | Err(UnexpectedEof(_)));
+			let is_eof = matches!(mip, Err(MipmapDataBeyondEof) | Err(EmptyMipmap) | Err(UnexpectedEof));
 
 			result.push(mip);
 
@@ -976,7 +1018,9 @@ impl PaaMipmap {
 			},
 
 			RleBlocks => {
-				let rle_data = compress_rleblock_slice(&self.data[..]);
+				let rle_data = RleWriter::with_minimum_run(3)
+					.filter_slice_to_vec(&self.data[..])
+					.unwrap();
 				compressed_data.extend(rle_data);
 			},
 		}
@@ -1009,127 +1053,9 @@ pub enum PaaMipmapCompression {
 }
 
 
-#[derive(Debug)]
-pub enum PaaTextureType {
-	Colormap,
-
-	ColormapWithAlpha,
-
-	NormalMap,
-	NormalMapSpecularWithAlpha,
-	NormalMapSpecularHighQualityWithAlpha,
-	NormalMapFaded,
-	NormalMapFadedHighQuality,
-	NormalMapWithAlphaNoise,
-	NormalMapHighQuality,
-	NormalMapHighQualityTwoComponentDxt5,
-
-	DetailTexture,
-	ColoredDetailTexture,
-	MultiplyColorMap,
-
-	MacroTexture,
-
-	AmbientShadowTexture,
-	AmbientShadowTextureDiffuse,
-
-	SpecularMap,
-	SpecularMapOptimized,
-	SpecularMapOptimizedDetail,
-
-	SkyTexture,
-
-	TerrainLayerColorMap,
-}
-
-
-impl Default for PaaTextureType {
-	fn default() -> Self {
-		PaaTextureType::ColormapWithAlpha
-	}
-}
-
-
-impl<'a> TryFrom<&'a str> for PaaTextureType {
-	type Error = ();
-
-	fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-		use PaaTextureType::*;
-
-		match &*value.to_lowercase() {
-			"co" => Ok(Colormap),
-			"ca" => Ok(ColormapWithAlpha),
-
-			"no" | "normalmap" => Ok(NormalMap),
-			"ns" => Ok(NormalMapSpecularWithAlpha),
-			"nshq" => Ok(NormalMapSpecularHighQualityWithAlpha),
-			"nof" => Ok(NormalMapFaded),
-			"nofhq" => Ok(NormalMapFadedHighQuality),
-			"non" => Ok(NormalMapWithAlphaNoise),
-			"nohq" => Ok(NormalMapHighQuality),
-			"novhq" => Ok(NormalMapHighQualityTwoComponentDxt5),
-
-			_ => Err(()),
-		}
-	}
-}
-
-
-//impl Into<String> for PaaTextureType {
-//}
-
-
-impl PaaTextureType {
-	pub fn has_alpha(&self) -> bool {
-		use PaaTextureType::*;
-		matches!(self,
-			ColormapWithAlpha | NormalMapSpecularWithAlpha |
-			NormalMapSpecularHighQualityWithAlpha | NormalMapWithAlphaNoise)
-	}
-
-
-	pub fn is_colormap(&self) -> bool {
-		use PaaTextureType::*;
-		matches!(self, Colormap | ColormapWithAlpha)
-	}
-
-
-	pub fn is_normalmap(&self) -> bool {
-		use PaaTextureType::*;
-		matches!(self,
-			NormalMap | NormalMapSpecularWithAlpha |
-			NormalMapSpecularHighQualityWithAlpha | NormalMapFaded |
-			NormalMapFadedHighQuality | NormalMapWithAlphaNoise |
-			NormalMapHighQuality | NormalMapHighQualityTwoComponentDxt5)
-	}
-
-
-	pub fn is_detailmap(&self) -> bool {
-		use PaaTextureType::*;
-		matches!(self, DetailTexture | ColoredDetailTexture | MultiplyColorMap)
-	}
-}
-
-
-pub struct PaaDecoder {
-}
-
-
-impl PaaDecoder {
-}
-
-
-pub struct PaaEncoder {
-}
-
-
-impl PaaEncoder {
-}
-
-
 /// A convenience function which extends an [`std::iter::Extend<u8>`] with a
 /// [`byteorder::ByteOrder`]-encoded integer.
-pub fn extend_with_uint<B, E, T, const N: usize>(e: &mut E, v: T)
+fn extend_with_uint<B, E, T, const N: usize>(e: &mut E, v: T)
 	where
 		B: ByteOrder,
 		E: Extend<u8>,
@@ -1156,7 +1082,7 @@ fn test_extend_with_uint() {
 }
 
 
-pub fn read_exact_buffered<R: Read>(input: &mut R, len: usize) -> PaaResult<Vec<u8>> {
+fn read_exact_buffered<R: Read>(input: &mut R, len: usize) -> PaaResult<Vec<u8>> {
 	const SINGLE_READ_SIZE: usize = 64;
 	let mut data: SegVec<u8> = SegVec::new();
 	let mut total = 0usize;
@@ -1168,7 +1094,7 @@ pub fn read_exact_buffered<R: Read>(input: &mut R, len: usize) -> PaaResult<Vec<
 
 		let bufsize = std::cmp::min(SINGLE_READ_SIZE, len-total);
 		let mut buf = vec![0u8; bufsize];
-		input.read_exact(&mut buf).map_err(|e| UnexpectedEof(e.kind()))?;
+		input.read_exact(&mut buf)?;
 		data.extend(&buf[..]);
 		total += bufsize;
 	}
@@ -1186,39 +1112,18 @@ fn test_read_exact_buffered() {
 }
 
 
-pub fn get_additive_i32_cksum(input: &[u8]) -> i32 {
-	input.iter().fold(0i32, |a, b| { a.wrapping_add(*b as i32) })
+fn get_additive_i32_cksum(_: &[u8]) -> i32 {
+	0
 }
 
 
-pub fn decompress_lzo_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>> {
+fn decompress_lzo_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>> {
 	let lzo = minilzo_rs::LZO::init().unwrap();
 	lzo.decompress_safe(input, dst_len).map_err(|e| LzoError(format!("{:?}", e)))
 }
 
 
-pub fn decompress_lzss_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>> {
-	let data = LzssReader::new().filter_slice_to_vec(input).unwrap();
-
-	if data.len() != dst_len {
-		return Err(LzssDecompressError);
-	};
-
-	Ok(data)
-}
-
-
-pub fn decompress_rleblock_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
-	RleReader::new().filter_slice_to_vec(input).map_err(RleError)
-}
-
-
-pub fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
+fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 	let mut lzo = minilzo_rs::LZO::init().unwrap();
 	lzo.compress(input).map_err(|e| LzoError(format!("{:?}", e)))
-}
-
-
-pub fn compress_rleblock_slice(input: &[u8]) -> Vec<u8> {
-	RleWriter::with_minimum_run(3).filter_slice_to_vec(input).unwrap()
 }
