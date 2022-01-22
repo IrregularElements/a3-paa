@@ -1127,7 +1127,7 @@ fn test_decompress_rleblock_slice() {
 	let data = vec![0x80u8, 0x41, 0x02, 0x00, 0x00, 0x00, 0x82, 0x41];
 	let wanted = vec![0x41u8, 0x00, 0x00, 0x00, 0x41, 0x41, 0x41];
 
-	let actual = decompress_rleblock_slice(&foo[..]).unwrap();
+	let actual = decompress_rleblock_slice(&data[..]).unwrap();
 
 	assert_eq!(wanted, actual);
 }
