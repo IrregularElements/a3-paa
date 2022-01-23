@@ -76,7 +76,7 @@ pub enum PaaError {
 	UnknownTransparencyValue(#[error(ignore)] u8),
 
 	/// [`PaaPalette::as_bytes`] received a palette with number of colors
-	/// overflowing a [`u16`][`std::primitive::u16`].
+	/// overflowing a [`u16`][std::primitive::u16].
 	PaletteTooLarge,
 
 	/// Mipmap returned by [`PaaMipmap::read_from`] or
@@ -104,7 +104,7 @@ pub enum PaaError {
 	UnexpectedMipmapDataSize(u16, u16, usize),
 
 	/// The [`PaaImage`] passed to [`PaaImage::as_bytes`] contained a
-	/// [fallible][`PaaMipmapContainer::Fallible`] container variant.
+	/// [fallible][PaaMipmapContainer::Fallible] container variant.
 	FallibleMipmapInput,
 
 	/// A checked arithmetic operation triggered an unexpected under/overflow.
@@ -166,13 +166,13 @@ macro_rules! debug_trace {
 }
 
 
-/// A wrapper around [`PaaImage::mipmaps`]; methods that read a `PaaImage`
-/// return `Fallible`; methods that write a `PaaImage` only accept `Infallible`.
+/// Wrapper around [`PaaImage::mipmaps`]; methods that read a [`PaaImage`] return
+/// `Fallible`; methods that write a `PaaImage` only accept `Infallible`.
 ///
 /// The exact way to convert between the two variants is up to the user;
 /// the most obvious idiom is to [collect][PaaMipmapContainer::into_infallible]
-/// inner vector of [`Fallible`][`PaaMipmapContainer::Infallible`] as
-/// `PaaResult<Vec<PaaMipmap>>`.
+/// the inner vector of [`Fallible`][PaaMipmapContainer::Fallible] as
+/// [`PaaResult<Vec<PaaMipmap>>`].
 #[derive(Debug, Clone)]
 pub enum PaaMipmapContainer {
 	Fallible(Vec<PaaResult<PaaMipmap>>),
@@ -239,6 +239,7 @@ pub struct PaaImage {
 
 
 impl PaaImage {
+	/// Read a [`PaaImage`][Self] from an [`std::io::Read`].
 	pub fn read_from<R: Read + Seek>(input: &mut R) -> PaaResult<Self> {
 		// [TODO] Index palette support
 		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?
@@ -327,14 +328,19 @@ impl PaaImage {
 	}
 
 
+	/// Wrap `input` with a [`Cursor`][std::io::Cursor] and
+	/// [`read_from`][`Self::read_from`] from it.
 	pub fn from_bytes(input: &[u8]) -> PaaResult<Self> {
 		let mut cursor = Cursor::new(input);
 		Self::read_from(&mut cursor)
 	}
 
 
+	/// Convert self to PAA data as `Vec<u8>`.
+	///
 	/// Ignores input Taggs::Offs and regenerates offsets based on actual mipmap
-	/// data.
+	/// data.  Will fail if [`self.mipmaps`] is
+	/// [`Fallible`][PaaMipmapContainer::Fallible].
 	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		let mut buf: Vec<u8> = Vec::with_capacity(10_000_000);
 
@@ -500,6 +506,8 @@ impl PaaType {
 	}
 
 
+	/// Calculates the size of uncompressed mipmap data from its width and
+	/// height.
 	pub const fn predict_size(&self, width: u16, height: u16) -> usize {
 		use PaaType::*;
 
@@ -525,28 +533,35 @@ impl PaaType {
 }
 
 
+/// Metadata frame present in PAA headers.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tagg {
+	/// Average color value
 	Avgc {
 		rgba: u32
 	},
 
+	/// Maximum color value
 	Maxc {
 		rgba: u32
 	},
 
 	Flag {
+		/// Texture transparency type
 		transparency: Transparency
 	},
 
+	/// Texture swizzle data (unknown format)
 	Swiz {
 		swizzle: u32
 	},
 
+	/// Unknown metadata
 	Proc {
 		text: BString
 	},
 
+	/// Mipmap offsets
 	Offs {
 		offsets: Vec<u32>
 	},
@@ -554,7 +569,7 @@ pub enum Tagg {
 
 
 impl Tagg {
-	/// Serialize a Tagg into Vec<u8>.
+	/// Serialize a Tagg into PAA-ready data.
 	pub fn as_bytes(&self) -> Vec<u8> {
 		const U32_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 
@@ -633,6 +648,7 @@ impl Tagg {
 	}
 
 
+	/// Constructs a [`Tagg`] from its name (e.g. "OFFS") and payload.
 	pub fn from_name_and_payload(taggname: &str, data: &[u8]) -> PaaResult<Self> {
 		if taggname.len() != 4 {
 			return Err(UnexpectedTaggSignature);
@@ -775,6 +791,7 @@ pub struct PaaPalette {
 
 
 impl PaaPalette {
+	/// Convert self to PAA data.
 	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		const_assert!(std::mem::size_of::<usize>() >= std::mem::size_of::<u16>());
 
@@ -795,7 +812,7 @@ impl PaaPalette {
 	}
 
 
-	/// Returns `Ok(None)` if palette is empty, `Ok(Self)` otherwise.
+	/// Returns `Ok(None)` if palette is empty, `Ok(palette)` otherwise.
 	pub fn read_from<R: Read>(input: &mut R) -> PaaResult<Option<Self>> {
 		const_assert!(std::mem::size_of::<usize>() >= 2);
 
