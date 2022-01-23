@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		}
 	}
 
-	let img = PaaImage { mipmaps: a3_paa::PaaMipmapContainer::Infallible(img.mipmaps.collect()?), ..img };
+	let img = img.into_infallible()?;
 
 	let data = img.to_bytes().unwrap();
 

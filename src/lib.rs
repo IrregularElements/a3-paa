@@ -135,7 +135,7 @@ macro_rules! debug_trace {
 /// return `Fallible`; methods that write a `PaaImage` only accept `Infallible`.
 ///
 /// The exact way to convert between the two variants is up to the user;
-/// the most obvious idiom is to [collect][`PaaMipmapContainer::collect`] the
+/// the most obvious idiom is to [collect][PaaMipmapContainer::into_infallible]
 /// inner vector of [`Fallible`][`PaaMipmapContainer::Infallible`] as
 /// `PaaResult<Vec<PaaMipmap>>`.
 #[derive(Debug)]
@@ -153,14 +153,22 @@ impl Default for PaaMipmapContainer {
 
 
 impl PaaMipmapContainer {
-	pub fn collect(self) -> PaaResult<Vec<PaaMipmap>> {
+	/// Returns `Ok(inner)` for [`Infallible`][PaaMipmapContainer::Infallible]
+	/// and [collects][std::iter::Iterator::collect] inner into
+	/// `PaaResult<Vec<PaaMipmap>>` for [Fallible][PaaMipmapContainer::Fallible].
+	pub fn into_infallible(self) -> PaaResult<Vec<PaaMipmap>> {
 		match self {
 			Self::Infallible(v) => PaaResult::Ok(v),
-			Self::Fallible(v) => v.into_iter().collect(),
+			Self::Fallible(v) => v
+				.into_iter()
+				.take_while(|m| !matches!(m, Err(EmptyMipmap)))
+				.collect(),
 		}
 	}
 
-	pub fn collect_fallible(self) -> Vec<PaaResult<PaaMipmap>> {
+	/// Returns all `Ok`'s for [`Infallible`][PaaMipmapContainer::Infallible]
+	/// and the inner value for [`Fallible`][PaaMipmapContainer::Fallible].
+	pub fn into_fallible(self) -> Vec<PaaResult<PaaMipmap>> {
 		match self {
 			Self::Infallible(v) => v.into_iter().map(PaaResult::Ok).collect(),
 			Self::Fallible(v) => v,
@@ -328,9 +336,12 @@ impl PaaImage {
 	}
 
 
+	/// Return an [infallible][PaaMipmapContainer::Infallible] version of
+	/// [`Self`] by [collecting][PaaMipmapContainer::into_infallible] the inner
+	/// mipmap container.
 	pub fn into_infallible(self) -> PaaResult<Self> {
 		let img = Self {
-			mipmaps: PaaMipmapContainer::Infallible(self.mipmaps.collect()?),
+			mipmaps: PaaMipmapContainer::Infallible(self.mipmaps.into_infallible()?),
 			..self
 		};
 
