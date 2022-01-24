@@ -1185,7 +1185,7 @@ pub fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 pub fn compress_lzss_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 	type MyLzss = lzss::Lzss<12, 4, 0x20, {1 <<12}, {2 << 12}>;
 
-	let bufsize = std::cmp::min(128, input.len() + MyLzss::MIN_OFFSET);
+	let bufsize = std::cmp::max(128, input.len() + MyLzss::MIN_OFFSET);
 	let mut buf: Vec<u8> = vec![0; bufsize];
 
 	let result = MyLzss::compress(lzss::SliceReader::new(input), lzss::SliceWriter::new(&mut buf))
