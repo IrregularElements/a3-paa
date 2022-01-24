@@ -861,8 +861,7 @@ impl PaaMipmap {
 		use PaaType::*;
 		use PaaMipmapCompression::*;
 
-		const _64_MIB: usize = 67_108_864;
-		let mut bytes: Vec<u8> = Vec::with_capacity(_64_MIB);
+		let mut bytes: SegVec<u8> = SegVec::new();
 
 		if self.width >= 32768 || self.height >= 32768 {
 			return Err(MipmapTooLarge);
@@ -893,7 +892,7 @@ impl PaaMipmap {
 		debug_trace!("MipMap::to_bytes: after width,height @ {}", bytes.len());
 
 		if self.is_empty() {
-			return Ok(bytes);
+			return Ok(bytes.into_iter().collect::<Vec<u8>>());
 		}
 
 		if let (Lzss { .. }, IndexPalette) = (&self.compression, &self.paatype) {
@@ -940,7 +939,7 @@ impl PaaMipmap {
 		bytes.extend(&compressed_data[..]);
 		debug_trace!("MipMap::to_bytes: after data @ {}", bytes.len());
 
-		Ok(bytes)
+		Ok(bytes.into_iter().collect::<Vec<u8>>())
 	}
 
 
