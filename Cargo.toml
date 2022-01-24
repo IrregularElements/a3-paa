@@ -23,4 +23,3 @@ image = { version = "0.23", optional = true }
 [dev-dependencies]
 fern = "0.5"
 chrono = "0.4"
-afl = "*"
