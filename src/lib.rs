@@ -343,7 +343,7 @@ impl PaaImage {
 }
 
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum PaaType {
 	Dxt1,
 
@@ -741,7 +741,7 @@ impl PaaPalette {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PaaMipmap {
 	pub width: u16,
 	pub height: u16,
