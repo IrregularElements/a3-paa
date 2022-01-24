@@ -21,6 +21,12 @@ path = ".."
 members = ["."]
 
 [[bin]]
+name = "mipmap"
+path = "fuzz_targets/mipmap.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "read_image"
 path = "fuzz_targets/read_image.rs"
 test = false
