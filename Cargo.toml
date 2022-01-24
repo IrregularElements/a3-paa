@@ -5,8 +5,7 @@ version = "0.0.1-dev"
 description = "Read and write the Bohemia Interactive PAA image format"
 
 [features]
-default = [ "dxt" ]
-dxt = [ "image" ]
+default = ["image"]
 
 [dependencies]
 static_assertions = "1.1"
