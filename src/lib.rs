@@ -17,9 +17,8 @@
 #![feature(seek_stream_len)]
 #![feature(let_chains)]
 
-
-// let_chains
-#![allow(incomplete_features)]
+#![allow(incomplete_features)] // let_chains
+#![allow(deprecated)]
 
 
 //! This crate provides methods for reading and writing the Bohemia Interactive
@@ -393,7 +392,6 @@ impl PaaType {
 
 
 	pub fn from_bytes(value: &[u8; 2]) -> Option<Self> {
-		#[allow(deprecated)]
 		match *value {
 			Self::PAXTYPE_DXT1_BYTES => Some(Self::Dxt1),
 			Self::PAXTYPE_DXT2_BYTES => Some(Self::Dxt2),
@@ -413,7 +411,6 @@ impl PaaType {
 	pub const fn to_bytes(&self) -> [u8; 2] {
 		use PaaType::*;
 
-		#[allow(deprecated)]
 		match self {
 			Dxt1 => Self::PAXTYPE_DXT1_BYTES,
 			Dxt2 => Self::PAXTYPE_DXT2_BYTES,
@@ -438,7 +435,6 @@ impl PaaType {
 
 		match self {
 			Dxt1 => { result /= 2 },
-			#[allow(deprecated)]
 			IndexPalette | Dxt2 | Dxt3 | Dxt4 | Dxt5 => (),
 			Rgba4 | Rgba5 | Gray => { result *= 2 },
 			Rgba8 => { result *= 4 },
@@ -448,7 +444,6 @@ impl PaaType {
 	}
 
 
-	#[allow(deprecated)]
 	pub const fn is_dxtn(&self) -> bool {
 		use PaaType::*;
 		matches!(self, Dxt1 | Dxt2 | Dxt3 | Dxt4 | Dxt5)
@@ -757,7 +752,6 @@ pub struct PaaMipmap {
 
 
 impl PaaMipmap {
-	#[allow(deprecated)]
 	pub fn read_from<R: Read + Seek>(input: &mut R, paatype: PaaType) -> PaaResult<Self> {
 		use PaaType::*;
 		use PaaMipmapCompression::*;
@@ -884,7 +878,6 @@ impl PaaMipmap {
 		let mut width = self.width;
 		let mut height = self.height;
 
-		#[allow(deprecated)]
 		if let (Lzss, IndexPalette) = (&self.compression, &self.paatype) && !self.is_empty() {
 			width = 1234;
 			height = 8765;
@@ -903,7 +896,6 @@ impl PaaMipmap {
 			return Ok(bytes);
 		}
 
-		#[allow(deprecated)]
 		if let (Lzss { .. }, IndexPalette) = (&self.compression, &self.paatype) {
 			extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, self.width);
 			extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, self.height);
