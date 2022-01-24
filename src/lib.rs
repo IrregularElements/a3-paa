@@ -16,6 +16,8 @@
 #![feature(derive_default_enum)]
 #![feature(seek_stream_len)]
 #![feature(let_chains)]
+#![feature(slice_group_by)]
+#![feature(slice_as_chunks)]
 
 #![allow(incomplete_features)] // let_chains
 #![allow(deprecated)]
@@ -38,6 +40,7 @@ use static_assertions::const_assert;
 use bstr::BString;
 use segvec::SegVec;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
+use itertools::Itertools;
 use derive_more::{Display, Error};
 
 use PaaError::*;
@@ -1254,5 +1257,57 @@ pub fn compress_lzss_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 
 #[allow(unused_variables)]
 pub fn compress_rleblock_slice(input: &[u8]) -> Vec<u8> {
-	todo!()
+	let mut result = SegVec::<u8>::new();
+
+	let groups = input
+		.group_by(|a, b| a == b)
+		.map(|g| g.to_vec())
+		.collect::<Vec<Vec<u8>>>();
+
+	let groups = &groups
+		.group_by(|a, b| a.len() == 1 && b.len() == 1)
+		.map(|g| g.to_vec().concat())
+		.collect::<Vec<Vec<u8>>>();
+
+	for data in groups {
+		let is_rle = data.iter().min() == data.iter().max() && data.len() > 1;
+
+		for chunk in &data.iter().chunks(0x7F) {
+			let data = chunk.copied().collect::<Vec<u8>>();
+			let len = data.len();
+
+			if len == 0 {
+				continue;
+			}
+
+			result.push(((len-1) as u8) ^ (if is_rle { 0x80 } else { 0x00 }));
+
+			if is_rle {
+				result.push(data[0]);
+			} else {
+				result.extend(data);
+			}
+		}
+	}
+
+	result.into_iter().collect::<Vec<u8>>()
+}
+
+
+#[test]
+fn test_compress_rleblock_slice() {
+	assert_eq!(vec![0u8; 0], compress_rleblock_slice(&vec![][..]));
+	assert_eq!(vec![0x00u8, 0x41], compress_rleblock_slice(&vec![0x41u8][..]));
+
+	let data = vec![0x61, 0x61, 0x84, 0x84, 0x10];
+	let wanted = vec![0x81, 0x61, 0x81, 0x84, 0x00, 0x10];
+	let actual = compress_rleblock_slice(&data[..]);
+	assert_eq!(wanted, actual);
+	let data_prime = decompress_rleblock_slice(&actual).unwrap();
+	assert_eq!(data, data_prime);
+
+	let data = vec![0xFFu8, 0xFF, 0x51, 0x52, 0x51, 0x51, 0x51, 0xFF];
+	let wanted = vec![0x81, 0xFF, 0x01, 0x51, 0x52, 0x82, 0x51, 0x00, 0xFF];
+	let actual = compress_rleblock_slice(&data[..]);
+	assert_eq!(wanted, actual);
 }
