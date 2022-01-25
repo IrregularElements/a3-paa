@@ -1152,12 +1152,12 @@ pub fn decompress_lzss_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>>
 
 	let mut text_buf = [0u8; N + F - 1];
 
-	let mut i: i16;
-	let mut j: i16;
-	let mut k: i16;
-	let mut r: i16 = (N - F) as i16;
-	let mut c: i16;
-	let mut flags = 0u16;
+	let mut i: libc::c_int;
+	let mut j: libc::c_int;
+	let mut k: libc::c_int;
+	let mut r: libc::c_int = (N - F) as libc::c_int;
+	let mut c: libc::c_int;
+	let mut flags: libc::c_uint = 0;
 
 	#[allow(clippy::needless_range_loop)]
 	for i in 0..N-F {
@@ -1170,7 +1170,7 @@ pub fn decompress_lzss_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>>
 		if (flags & 0x100) == 0 {
 			if src < srcend { c = input[src].into(); src += 1; } else { break; };
 
-			flags = u16::from_le_bytes(c.to_le_bytes()) | 0xFF00;
+			flags = libc::c_uint::from_le_bytes(c.to_le_bytes()) | 0xFF00;
 		}
 
 		if flags & 1 != 0 {
@@ -1179,21 +1179,21 @@ pub fn decompress_lzss_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>>
 			dst += 1;
 			text_buf[r as usize] = (c & 0xFF) as u8;
 			r += 1;
-			r &= (N - 1) as i16;
+			r &= (N - 1) as libc::c_int;
 		}
 		else {
 			if src < srcend { i = input[src].into(); src += 1; } else { break; };
 			if src < srcend { j = input[src].into(); src += 1; } else { break; };
 			i |= (j & 0xF0) << 4;
-			j = (j & 0x0F) + THRESHOLD as i16;
+			j = (j & 0x0F) + THRESHOLD as libc::c_int;
 
 			for k in 0..=j {
-				c = text_buf[(i + k) as usize & (N - 1)] as i16;
+				c = text_buf[(i + k) as usize & (N - 1)] as libc::c_int;
 				dst_buf[dst] = c as u8;
 				dst += 1;
 				text_buf[r as usize] = c as u8;
 				r += 1;
-				r &= (N - 1) as i16;
+				r &= (N - 1) as libc::c_int;
 			}
 		}
 	}
