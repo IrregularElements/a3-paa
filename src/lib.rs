@@ -204,7 +204,10 @@ impl PaaImage {
 			let stream_position = input.stream_position().unwrap();
 			debug_trace!("Seek position: {:?}", stream_position);
 
-			let tagghead = Tagg::read_head_from(input);
+			let mut tagghead_data = [0u8; 12];
+			input.read_exact(&mut tagghead_data).map_err(|e| UnexpectedEof(e.kind()))?;
+
+			let tagghead = Tagg::try_head_from(&tagghead_data);
 			debug_trace!("TAGG head: {:?}", tagghead);
 
 			match tagghead {
@@ -538,30 +541,25 @@ impl Tagg {
 	}
 
 
-	/// Read a fixed (12) number of bytes from `input` and validate contained
-	/// Tagg metadata: "TAGG" signature, tag name, and payload length.
-	/// Returns PaaResult<(name: String, payload_size: u32)>.
-	pub fn read_head_from<R: Read>(input: &mut R) -> PaaResult<(String, u32)> {
-		let tagghead: [u8; 12] = read_exact_buffered(input, 12)?
-			.try_into()
-			.expect("Could not convert tagghead (this is a bug)");
-
-		let taggsig = &tagghead[0..4];
+	/// Validate Tagg metadata contained in `data`: "TAGG" signature, tag name,
+	/// and payload length.  Returns PaaResult<(name: String, payload_size: u32)>.
+	pub fn try_head_from(data: &[u8; 12]) -> PaaResult<(String, u32)> {
+		let taggsig = &data[0..4];
 
 		// "GGAT" signature
 		if taggsig != [0x47u8, 0x47, 0x41, 0x54] {
 			return Err(UnexpectedTaggSignature);
 		}
 
-		let taggname: String = std::str::from_utf8(&tagghead[4..8])
-			.map_err(|_| UnknownTaggType((&tagghead[4..8]).try_into().unwrap()))?
+		let taggname: String = std::str::from_utf8(&data[4..8])
+			.map_err(|_| UnknownTaggType((&data[4..8]).try_into().unwrap()))?
 			.into();
 
 		if ! Self::is_valid_taggname(&taggname) {
 			return Err(UnknownTaggType(taggname.as_bytes().try_into().unwrap()));
 		}
 
-		let payload_length = LittleEndian::read_u32(&tagghead[8..12]);
+		let payload_length = LittleEndian::read_u32(&data[8..12]);
 
 		Ok((taggname, payload_length))
 	}
