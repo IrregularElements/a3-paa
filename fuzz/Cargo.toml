@@ -11,6 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.0", features = ["derive"] }
+bstr = "0.2"
 
 [dependencies.a3-paa]
 path = ".."
@@ -28,5 +29,11 @@ doc = false
 [[bin]]
 name = "rle_compression"
 path = "fuzz_targets/rle_compression.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "tagg"
+path = "fuzz_targets/tagg.rs"
 test = false
 doc = false
