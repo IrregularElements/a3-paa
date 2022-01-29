@@ -1131,6 +1131,15 @@ pub fn read_exact_buffered<R: Read>(input: &mut R, len: usize) -> PaaResult<Vec<
 }
 
 
+#[test]
+fn test_read_exact_buffered() {
+	let mut input = Cursor::new(vec![0x41u8, 0x42, 0x43, 0x44, 0x45, 0x46]);
+	assert_eq!(read_exact_buffered(&mut input, 1).unwrap(), vec![0x41u8]);
+	assert_eq!(read_exact_buffered(&mut input, 2).unwrap(), vec![0x42u8, 0x43]);
+	assert_eq!(read_exact_buffered(&mut input, 3).unwrap(), vec![0x44u8, 0x45, 0x46]);
+}
+
+
 pub fn get_additive_i32_cksum(input: &[u8]) -> i32 {
 	input.iter().fold(0i32, |a, b| { a.wrapping_add(*b as i32) })
 }
