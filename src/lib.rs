@@ -5,7 +5,6 @@
 // [TODO]
 // ======
 // - Add index palette support
-// - Fix PaaImage::to_bytes
 // - Fix LZSS: it's underflowing or overflowing on decompression; looks like an incorrect algorithm
 // - Add RLE compression
 // - Add image-rs decoding/encoding via PaaDecoder / PaaEncoder
@@ -290,19 +289,14 @@ impl PaaImage {
 			buf.extend(t.to_bytes());
 		}
 
-		let offs_position = buf.len();
+		let offs_length = Tagg::Offs { offsets: vec![] }.to_bytes().len() as u32;
 
-		// Placeholder offsets Tagg to be populated later
-		buf.extend(Tagg::Offs { offsets: vec![] }.to_bytes());
-
-		if let Some(p) = &self.palette {
-			buf.extend(p.to_bytes()?);
+		let palette_data = if let Some(p) = &self.palette {
+			p.to_bytes()?
 		}
 		else {
-			buf.extend([0u8, 0]);
-		}
-
-		let mipmaps_position = buf.len() as u32;
+			vec![0u8, 0]
+		};
 
 		let mipmaps = if let PaaMipmapContainer::Infallible(mipmaps) = &self.mipmaps {
 			Ok(mipmaps)
@@ -310,6 +304,8 @@ impl PaaImage {
 		else {
 			Err(FallibleMipmapInput)
 		}?;
+
+		let mipmaps_offset = buf.len() as u32 + offs_length + palette_data.len() as u32;
 
 		let mipmap_blocks = mipmaps
 			.iter()
@@ -319,16 +315,18 @@ impl PaaImage {
 		let mipmap_block_offsets: Vec<u32> = mipmap_blocks
 			.iter()
 			.scan(0, |acc, b| {
-				debug_trace!("mipmap_block_offsets: current={} b.len()={} offset={}", *acc, b.len(), *acc + mipmaps_position);
 				let current = *acc;
+				let offset = current + mipmaps_offset;
+				debug_trace!("mipmap_block_offsets: current={} b.len()={} offset={}", *acc, b.len(), offset);
 				*acc += b.len() as u32;
-				Some(current + mipmaps_position)
+				Some(offset)
 			})
 			.collect::<Vec<u32>>();
 
-		let new_offs = Tagg::Offs { offsets: mipmap_block_offsets }.to_bytes();
+		let new_offs = Tagg::Offs { offsets: mipmap_block_offsets };
+		buf.extend(new_offs.to_bytes());
 
-		buf.splice(offs_position..(offs_position + new_offs.len() + 1), new_offs);
+		buf.extend(palette_data);
 
 		for m in mipmap_blocks {
 			buf.extend(m);
