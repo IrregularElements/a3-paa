@@ -457,7 +457,7 @@ impl PaaType {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Tagg {
 	Avgc {
 		rgba: u32
@@ -658,7 +658,7 @@ impl Tagg {
 }
 
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum Transparency {
 	None,
 	#[default]
