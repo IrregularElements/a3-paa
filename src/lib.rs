@@ -12,13 +12,6 @@
 // - When done, remove Seek from PaaMipmap methods
 
 
-#![feature(derive_default_enum)]
-#![feature(seek_stream_len)]
-#![feature(let_chains)]
-#![feature(slice_group_by)]
-#![feature(slice_as_chunks)]
-
-#![allow(incomplete_features)] // let_chains
 #![allow(deprecated)]
 
 
@@ -35,6 +28,7 @@ use bstr::BString;
 use segvec::SegVec;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use itertools::Itertools;
+use slice_group_by::GroupBy;
 use derive_more::{Display, Error};
 
 use PaaError::*;
@@ -187,8 +181,6 @@ pub struct PaaImage {
 
 impl PaaImage {
 	pub fn read_from<R: Read + Seek>(input: &mut R) -> PaaResult<Self> {
-		let stream_len = input.stream_len().map_err(|e| UnexpectedEof(e.kind()))?;
-
 		// [TODO] Index palette support
 		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?.try_into().expect("Could not convert paatype_bytes (this is a bug)");
 		let paatype = PaaType::from_bytes(&paatype_bytes)
@@ -251,9 +243,7 @@ impl PaaImage {
 			PaaMipmap::read_from_until_eof(input, paatype)
 		} else {
 			offs.iter().enumerate().map(|(_idx, offset)| {
-				if (*offset).checked_add(4).ok_or(CorruptedData)? >= stream_len as u32 {
-					return Err(MipmapOffsetBeyondEof);
-				}
+				let _ = (*offset).checked_add(4).ok_or(CorruptedData)?;
 
 				input.seek(SeekFrom::Start(*offset as u64)).unwrap();
 
@@ -349,7 +339,7 @@ impl PaaImage {
 }
 
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PaaType {
 	Dxt1,
 
@@ -362,7 +352,6 @@ pub enum PaaType {
 	#[deprecated]
 	Dxt4,
 
-	#[default]
 	Dxt5,
 
 	/// RGBA 4:4:4:4
@@ -380,6 +369,13 @@ pub enum PaaType {
 	/// 1 byte (offset into the index palette, which contains BGR 8:8:8)
 	#[deprecated = "[TODO] Index palette format is not implemented"]
 	IndexPalette,
+}
+
+
+impl Default for PaaType {
+	fn default() -> Self {
+		PaaType::Dxt5
+	}
 }
 
 
@@ -496,35 +492,35 @@ impl Tagg {
 
 		match self {
 			Self::Avgc { rgba } => {
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, *rgba);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *rgba);
 			},
 
 			Self::Maxc { rgba } => {
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, *rgba);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *rgba);
 			},
 
 			Self::Flag { transparency } => {
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, U32_SIZE);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
 				let trans = <u8 as From<&Transparency>>::from(transparency);
 				bytes.extend([trans, 0, 0, 0]);
 			},
 
 			Self::Swiz { swizzle } => {
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, *swizzle);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *swizzle);
 			},
 
 			Self::Proc { text } => {
 				let len = (&text[..]).len() as u32;
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, len);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, len);
 				bytes.extend(&text[..]);
 			},
 
 			Self::Offs { offsets } => {
 				let len = (16 * std::mem::size_of::<u32>()) as u32;
-				extend_with_uint::<LittleEndian,Vec<u8>, 4, _>(&mut bytes, len);
+				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, len);
 
 				let mut buf = [0u8; 16*4];
 				let mut offsets = offsets.clone();
@@ -658,12 +654,18 @@ impl Tagg {
 }
 
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Transparency {
 	None,
-	#[default]
 	AlphaInterpolated,
 	AlphaNotInterpolated,
+}
+
+
+impl Default for Transparency {
+	fn default() -> Self {
+		Transparency::AlphaInterpolated
+	}
 }
 
 
@@ -711,7 +713,7 @@ impl PaaPalette {
 		let ntriplets = self.triplets.len() as u16;
 		let mut buf: Vec<u8> = Vec::with_capacity(2 + (ntriplets as usize) * 3);
 
-		extend_with_uint::<LittleEndian, _, 2, _>(&mut buf, ntriplets);
+		extend_with_uint::<LittleEndian, _, _, 2>(&mut buf, ntriplets);
 
 		for triplet in self.triplets.iter() {
 			buf.extend(triplet);
@@ -882,17 +884,21 @@ impl PaaMipmap {
 		   return Err(UnexpectedMipmapDataSize(width, height, self.data.len()));
 	   }
 
-		if let (Lzss, IndexPalette) = (&self.compression, &self.paatype) && !self.is_empty() {
-			width = 1234;
-			height = 8765;
+		if let (Lzss, IndexPalette) = (&self.compression, &self.paatype) {
+			if !self.is_empty() {
+				width = 1234;
+				height = 8765;
+			}
 		}
 
-		if let Lzo = &self.compression && self.paatype.is_dxtn() && !self.is_empty() {
-			width ^= 0x8000;
+		if let Lzo = &self.compression {
+			if self.paatype.is_dxtn() && !self.is_empty() {
+				width ^= 0x8000;
+			}
 		}
 
-		extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, width);
-		extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, height);
+		extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, width);
+		extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, height);
 
 		debug_trace!("MipMap::to_bytes: after width,height @ {}", bytes.len());
 
@@ -901,8 +907,8 @@ impl PaaMipmap {
 		}
 
 		if let (Lzss { .. }, IndexPalette) = (&self.compression, &self.paatype) {
-			extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, self.width);
-			extend_with_uint::<LittleEndian, _, 2, _>(&mut bytes, self.height);
+			extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, self.width);
+			extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, self.height);
 
 			// [TODO] Does the mipmap code on Biki mean that index palette lzss
 			// data does not have `byte size[3]`?  I'm thinking probably not but
@@ -939,7 +945,7 @@ impl PaaMipmap {
 			},
 		}
 
-		extend_with_uint::<LittleEndian, _, 3, u32>(&mut bytes, compressed_data.len() as u32);
+		extend_with_uint::<LittleEndian, _, u32, 3>(&mut bytes, compressed_data.len() as u32);
 		debug_trace!("MipMap::to_bytes: after length @ {}", bytes.len());
 		bytes.extend(&compressed_data[..]);
 		debug_trace!("MipMap::to_bytes: after data @ {}", bytes.len());
@@ -967,11 +973,10 @@ pub enum PaaMipmapCompression {
 }
 
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum PaaTextureType {
 	Colormap,
 
-	#[default]
 	ColormapWithAlpha,
 
 	NormalMap,
@@ -999,6 +1004,13 @@ pub enum PaaTextureType {
 	SkyTexture,
 
 	TerrainLayerColorMap,
+}
+
+
+impl Default for PaaTextureType {
+	fn default() -> Self {
+		PaaTextureType::ColormapWithAlpha
+	}
 }
 
 
@@ -1081,7 +1093,7 @@ impl PaaEncoder {
 
 /// A convenience function which extends an [`std::iter::Extend<u8>`] with a
 /// [`byteorder::ByteOrder`]-encoded integer.
-pub fn extend_with_uint<B, E, const N: usize, T>(e: &mut E, v: T)
+pub fn extend_with_uint<B, E, T, const N: usize>(e: &mut E, v: T)
 	where
 		B: ByteOrder,
 		E: Extend<u8>,
@@ -1097,13 +1109,13 @@ pub fn extend_with_uint<B, E, const N: usize, T>(e: &mut E, v: T)
 fn test_extend_with_uint() {
 	let mut dest = vec![];
 
-	extend_with_uint::<LittleEndian, _, 2, _>(&mut dest, 1234u16);
+	extend_with_uint::<LittleEndian, _, _, 2>(&mut dest, 1234u16);
 	assert_eq!(dest, vec![0xD2, 0x04]);
 
-	extend_with_uint::<LittleEndian, _, 3, _>(&mut dest, 1234u32);
+	extend_with_uint::<LittleEndian, _, _, 3>(&mut dest, 1234u32);
 	assert_eq!(dest, vec![0xD2, 0x04, 0xD2, 0x04, 0x00]);
 
-	extend_with_uint::<BigEndian, _, 4, _>(&mut dest, 5678u32);
+	extend_with_uint::<BigEndian, _, _, 4>(&mut dest, 5678u32);
 	assert_eq!(dest, vec![0xD2, 0x04, 0xD2, 0x04, 0x00, 0x00, 0x00, 0x16, 0x2E]);
 }
 
@@ -1271,12 +1283,12 @@ pub fn compress_rleblock_slice(input: &[u8]) -> Vec<u8> {
 	let mut result = SegVec::<u8>::new();
 
 	let groups = input
-		.group_by(|a, b| a == b)
+		.linear_group_by(|a, b| a == b)
 		.map(|g| g.to_vec())
 		.collect::<Vec<Vec<u8>>>();
 
 	let groups = &groups
-		.group_by(|a, b| a.len() == 1 && b.len() == 1)
+		.linear_group_by(|a, b| a.len() == 1 && b.len() == 1)
 		.map(|g| g.to_vec().concat())
 		.collect::<Vec<Vec<u8>>>();
 
