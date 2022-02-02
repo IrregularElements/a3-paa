@@ -23,12 +23,16 @@ use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
+use bohemia_compression::{
+	BcError,
+	Algorithm,
+	RleReader,
+	RleWriter,
+};
 use static_assertions::const_assert;
 use bstr::BString;
 use segvec::SegVec;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
-use itertools::Itertools;
-use slice_group_by::GroupBy;
 use derive_more::{Display, Error};
 
 use PaaError::*;
@@ -100,7 +104,11 @@ pub enum PaaError {
 	/// A checked arithmetic operation triggered an unexpected under/overflow.
 	CorruptedData,
 
-	/// DXT-LZO decompression failed.
+	/// An error occurred while uncompressing RLE data (this likely means the
+	/// data is incomplete).
+	RleError(BcError),
+
+	/// DXT-LZO de/compression failed.
 	LzoError(/*MinilzoError*/ #[error(ignore)] String),
 
 	LzssCompressError(#[error(ignore)] String),
@@ -1237,36 +1245,7 @@ pub fn decompress_lzss_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>>
 
 
 pub fn decompress_rleblock_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
-	const_assert!(std::mem::size_of::<usize>() >= 1);
-
-	let mut cursor = Cursor::new(input);
-	let mut buf: Vec<u8> = Vec::with_capacity(input.len() * 2);
-
-	while let Ok(flag) = cursor.read_u8() {
-		let data = if flag & 0x80 != 0 {
-			let n = (flag ^ 0x80) + 1;
-			let byte = cursor.read_u8().map_err(|e| UnexpectedEof(e.kind()))?;
-			vec![byte; n as usize]
-		}
-		else {
-			let n = flag + 1;
-			read_exact_buffered(&mut cursor, n as usize)?
-		};
-
-		buf.extend(data);
-	}
-
-	Ok(buf)
-}
-
-#[test]
-fn test_decompress_rleblock_slice() {
-	let data = vec![0x80u8, 0x41, 0x02, 0x00, 0x00, 0x00, 0x82, 0x41];
-	let wanted = vec![0x41u8, 0x00, 0x00, 0x00, 0x41, 0x41, 0x41];
-
-	let actual = decompress_rleblock_slice(&data[..]).unwrap();
-
-	assert_eq!(wanted, actual);
+	RleReader::new().filter_slice_to_vec(input).map_err(RleError)
 }
 
 
@@ -1289,59 +1268,6 @@ pub fn compress_lzss_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 }
 
 
-#[allow(unused_variables)]
 pub fn compress_rleblock_slice(input: &[u8]) -> Vec<u8> {
-	let mut result = SegVec::<u8>::new();
-
-	let groups = input
-		.linear_group_by(|a, b| a == b)
-		.map(|g| g.to_vec())
-		.collect::<Vec<Vec<u8>>>();
-
-	let groups = &groups
-		.linear_group_by(|a, b| a.len() == 1 && b.len() == 1)
-		.map(|g| g.to_vec().concat())
-		.collect::<Vec<Vec<u8>>>();
-
-	for data in groups {
-		let is_rle = data.iter().min() == data.iter().max() && data.len() > 1;
-
-		for chunk in &data.iter().chunks(0x7F) {
-			let data = chunk.copied().collect::<Vec<u8>>();
-			let len = data.len();
-
-			if len == 0 {
-				continue;
-			}
-
-			result.push(((len-1) as u8) ^ (if is_rle { 0x80 } else { 0x00 }));
-
-			if is_rle {
-				result.push(data[0]);
-			} else {
-				result.extend(data);
-			}
-		}
-	}
-
-	result.into_iter().collect::<Vec<u8>>()
-}
-
-
-#[test]
-fn test_compress_rleblock_slice() {
-	assert_eq!(vec![0u8; 0], compress_rleblock_slice(&vec![][..]));
-	assert_eq!(vec![0x00u8, 0x41], compress_rleblock_slice(&vec![0x41u8][..]));
-
-	let data = vec![0x61, 0x61, 0x84, 0x84, 0x10];
-	let wanted = vec![0x81, 0x61, 0x81, 0x84, 0x00, 0x10];
-	let actual = compress_rleblock_slice(&data[..]);
-	assert_eq!(wanted, actual);
-	let data_prime = decompress_rleblock_slice(&actual).unwrap();
-	assert_eq!(data, data_prime);
-
-	let data = vec![0xFFu8, 0xFF, 0x51, 0x52, 0x51, 0x51, 0x51, 0xFF];
-	let wanted = vec![0x81, 0xFF, 0x01, 0x51, 0x52, 0x82, 0x51, 0x00, 0xFF];
-	let actual = compress_rleblock_slice(&data[..]);
-	assert_eq!(wanted, actual);
+	RleWriter::with_minimum_run(3).unwrap().filter_slice_to_vec(input).unwrap()
 }
