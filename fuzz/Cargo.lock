@@ -77,7 +77,7 @@ dependencies = [
 [[package]]
 name = "bohemia-compression"
 version = "0.0.1-dev"
-source = "git+https://github.com/IrregularElements/bohemia-compression.git#5a048b120d78d7f4f9a4427cf425d48620b6ef0b"
+source = "git+https://github.com/IrregularElements/bohemia-compression.git?rev=5a048b120d78d7f4f9a4427cf425d48620b6ef0b#5a048b120d78d7f4f9a4427cf425d48620b6ef0b"
 dependencies = [
  "bitvec",
  "derive_more",

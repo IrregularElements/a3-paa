@@ -10,7 +10,6 @@ default = ["image"]
 [dependencies]
 static_assertions = "1.1"
 derive_more = "0.99"
-bohemia-compression = { git = "https://github.com/IrregularElements/bohemia-compression.git" }
 byteorder = "1.4"
 bstr = "0.2"
 segvec = "0.1"
@@ -19,6 +18,10 @@ minilzo-rs = "0.6"
 lzss = "0.8"
 log = "0.4"
 image = { version = "0.23", optional = true }
+
+[dependencies.bohemia-compression]
+git = "https://github.com/IrregularElements/bohemia-compression.git"
+rev = "5a048b120d78d7f4f9a4427cf425d48620b6ef0b"
 
 [dev-dependencies]
 fern = "0.5"
