@@ -820,7 +820,7 @@ impl PaaMipmap {
 			},
 
 			Lzss => {
-				let split_pos = compressed_data_buf.len().checked_sub(4+1).ok_or(CorruptedData)?;
+				let split_pos = compressed_data_buf.len().checked_sub(4).ok_or(CorruptedData)?;
 				let (lzss_slice, checksum_slice) = compressed_data_buf.split_at(split_pos);
 				let checksum = LittleEndian::read_i32(checksum_slice);
 				let uncompressed_data = decompress_lzss_slice(lzss_slice, data_len)?;
