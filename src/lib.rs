@@ -23,13 +23,7 @@ use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
-use bohemia_compression::{
-	BcError,
-	Algorithm,
-	RleReader,
-	RleWriter,
-	LzssReader,
-};
+use bohemia_compression::*;
 use static_assertions::const_assert;
 use bstr::BString;
 use segvec::SegVec;
@@ -111,8 +105,6 @@ pub enum PaaError {
 
 	/// DXT-LZO de/compression failed.
 	LzoError(/*MinilzoError*/ #[error(ignore)] String),
-
-	LzssCompressError(#[error(ignore)] String),
 
 	/// LZSS decompression failed.
 	LzssDecompressError,
@@ -950,7 +942,9 @@ impl PaaMipmap {
 			},
 
 			Lzss => {
-				let lzss_data = compress_lzss_slice(&self.data[..])?;
+				let lzss_data = LzssWriter::new()
+					.filter_slice_to_vec(&self.data[..])
+					.unwrap();
 				compressed_data.extend(lzss_data);
 
 				let cksum = get_additive_i32_cksum(&self.data[..]);
@@ -1203,19 +1197,6 @@ pub fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 }
 
 
-pub fn compress_lzss_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
-	type MyLzss = lzss::Lzss<12, 4, 0x20, {1 <<12}, {2 << 12}>;
-
-	let bufsize = std::cmp::max(128, input.len() + MyLzss::MIN_OFFSET);
-	let mut buf: Vec<u8> = vec![0; bufsize];
-
-	let result = MyLzss::compress(lzss::SliceReader::new(input), lzss::SliceWriter::new(&mut buf))
-		.map_err(|e| LzssCompressError(format!("{}", e)))?;
-	buf.truncate(result);
-	Ok(buf)
-}
-
-
 pub fn compress_rleblock_slice(input: &[u8]) -> Vec<u8> {
-	RleWriter::with_minimum_run(3).unwrap().filter_slice_to_vec(input).unwrap()
+	RleWriter::with_minimum_run(3).filter_slice_to_vec(input).unwrap()
 }

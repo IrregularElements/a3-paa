@@ -15,13 +15,12 @@ bstr = "0.2"
 segvec = "0.1"
 libc = "0.2"
 minilzo-rs = "0.6"
-lzss = "0.8"
 log = "0.4"
 image = { version = "0.23", optional = true }
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
-rev = "5a048b120d78d7f4f9a4427cf425d48620b6ef0b"
+rev = "866deb7abe3f68c9029194d691f0a78513c7a010"
 
 [dev-dependencies]
 fern = "0.5"
