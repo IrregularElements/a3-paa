@@ -20,7 +20,7 @@ image = { version = "0.23", optional = true }
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
-rev = "866deb7abe3f68c9029194d691f0a78513c7a010"
+rev = "1fd0288507f2868f412f6574c24d80df654ac1bd"
 
 [dev-dependencies]
 fern = "0.5"
