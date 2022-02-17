@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let img = img.into_infallible()?;
 
-	let data = img.to_bytes().unwrap();
+	let data = img.as_bytes().unwrap();
 
 	std::fs::write(std::env::args().nth(2).unwrap_or("/dev/null".to_string()), data).unwrap();
 

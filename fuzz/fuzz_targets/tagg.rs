@@ -143,7 +143,7 @@ fuzz_target!(|tuple: (TaggFuzzer, &[u8])| {
 	let tagg_name = tagg.as_taggname();
 	assert!(Tagg::is_valid_taggname(&tagg_name));
 
-	let bytes = tagg.to_bytes();
+	let bytes = tagg.as_bytes();
 	let tagg_data = &bytes[12..];
 
 	let tagg_prime = Tagg::from_name_and_payload(&tagg_name, tagg_data).unwrap();

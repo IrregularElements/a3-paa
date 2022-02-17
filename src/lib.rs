@@ -64,7 +64,7 @@ pub enum PaaError {
 	/// Attempted to read a [`Tagg::Flag`] with unexpected transparency value.
 	UnknownTransparencyValue(#[error(ignore)] u8),
 
-	/// [`PaaPalette::to_bytes`] received a palette with number of colors
+	/// [`PaaPalette::as_bytes`] received a palette with number of colors
 	/// overflowing a [`u16`][`std::primitive::u16`].
 	PaletteTooLarge,
 
@@ -92,7 +92,7 @@ pub enum PaaError {
 	#[display(fmt = "UnexpectedMipmapDataSize({}, {}, {})", _0, _1, _2)]
 	UnexpectedMipmapDataSize(u16, u16, usize),
 
-	/// The [`PaaImage`] passed to [`PaaImage::to_bytes`] contained a
+	/// The [`PaaImage`] passed to [`PaaImage::as_bytes`] contained a
 	/// [fallible][`PaaMipmapContainer::Fallible`] container variant.
 	FallibleMipmapInput,
 
@@ -291,23 +291,23 @@ impl PaaImage {
 
 	/// Ignores input Taggs::Offs and regenerates offsets based on actual mipmap
 	/// data.
-	pub fn to_bytes(&self) -> PaaResult<Vec<u8>> {
+	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		let mut buf: Vec<u8> = Vec::with_capacity(10_000_000);
 
-		buf.extend(self.paatype.to_bytes());
+		buf.extend(self.paatype.as_bytes());
 
 		for ref t in self.taggs.iter() {
 			if let Tagg::Offs { .. } = t {
 				continue;
 			}
 
-			buf.extend(t.to_bytes());
+			buf.extend(t.as_bytes());
 		}
 
-		let offs_length = Tagg::Offs { offsets: vec![] }.to_bytes().len() as u32;
+		let offs_length = Tagg::Offs { offsets: vec![] }.as_bytes().len() as u32;
 
 		let palette_data = if let Some(p) = &self.palette {
-			p.to_bytes()?
+			p.as_bytes()?
 		}
 		else {
 			vec![0u8, 0]
@@ -324,7 +324,7 @@ impl PaaImage {
 
 		let mipmap_blocks = mipmaps
 			.iter()
-			.map(|m| m.to_bytes())
+			.map(|m| m.as_bytes())
 			.collect::<PaaResult<Vec<Vec<u8>>>>()?;
 
 		let mipmap_block_offsets: Vec<u32> = mipmap_blocks
@@ -339,7 +339,7 @@ impl PaaImage {
 			.collect::<Vec<u32>>();
 
 		let new_offs = Tagg::Offs { offsets: mipmap_block_offsets };
-		buf.extend(new_offs.to_bytes());
+		buf.extend(new_offs.as_bytes());
 
 		buf.extend(palette_data);
 
@@ -438,7 +438,7 @@ impl PaaType {
 	}
 
 
-	pub const fn to_bytes(&self) -> [u8; 2] {
+	pub const fn as_bytes(&self) -> [u8; 2] {
 		use PaaType::*;
 
 		match self {
@@ -511,7 +511,7 @@ pub enum Tagg {
 
 impl Tagg {
 	/// Serialize a Tagg into Vec<u8>.
-	pub fn to_bytes(&self) -> Vec<u8> {
+	pub fn as_bytes(&self) -> Vec<u8> {
 		const U32_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 
 		let mut bytes: Vec<u8> = Vec::with_capacity(256);
@@ -731,7 +731,7 @@ pub struct PaaPalette {
 
 
 impl PaaPalette {
-	pub fn to_bytes(&self) -> PaaResult<Vec<u8>> {
+	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		const_assert!(std::mem::size_of::<usize>() >= std::mem::size_of::<u16>());
 
 		if self.triplets.len() > u16::MAX as usize {
@@ -888,7 +888,7 @@ impl PaaMipmap {
 	}
 
 
-	pub fn to_bytes(&self) -> PaaResult<Vec<u8>> {
+	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		use PaaType::*;
 		use PaaMipmapCompression::*;
 
@@ -928,7 +928,7 @@ impl PaaMipmap {
 		extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, width);
 		extend_with_uint::<LittleEndian, _, _, 2>(&mut bytes, height);
 
-		debug_trace!("MipMap::to_bytes: after width,height @ {}", bytes.len());
+		debug_trace!("MipMap::as_bytes: after width,height @ {}", bytes.len());
 
 		if self.is_empty() {
 			return Ok(bytes.into_iter().collect::<Vec<u8>>());
@@ -943,7 +943,7 @@ impl PaaMipmap {
 			// this needs to be tested on old PACs
 		}
 
-		debug_trace!("MipMap::to_bytes: after Lzss @ {}", bytes.len());
+		debug_trace!("MipMap::as_bytes: after Lzss @ {}", bytes.len());
 
 		let mut compressed_data: Vec<u8> = Vec::with_capacity(std::cmp::min(self.data.len() * 2, 128));
 
@@ -976,9 +976,9 @@ impl PaaMipmap {
 		}
 
 		extend_with_uint::<LittleEndian, _, u32, 3>(&mut bytes, compressed_data.len() as u32);
-		debug_trace!("MipMap::to_bytes: after length @ {}", bytes.len());
+		debug_trace!("MipMap::as_bytes: after length @ {}", bytes.len());
 		bytes.extend(&compressed_data[..]);
-		debug_trace!("MipMap::to_bytes: after data @ {}", bytes.len());
+		debug_trace!("MipMap::as_bytes: after data @ {}", bytes.len());
 
 		Ok(bytes.into_iter().collect::<Vec<u8>>())
 	}
