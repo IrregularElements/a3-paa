@@ -175,6 +175,22 @@ impl PaaMipmapContainer {
 			Self::Fallible(v) => v,
 		}
 	}
+
+
+	/// Returns the length of the inner `Vec`.  If `self` is `Fallible`, this
+	/// includes all errors.
+	pub fn len(&self) -> usize {
+		match self {
+			Self::Infallible(v) => v.len(),
+			Self::Fallible(v) => v.len(),
+		}
+	}
+
+
+	/// Returns true if the inner vector is empty.
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
 }
 
 
