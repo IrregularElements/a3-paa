@@ -6,8 +6,17 @@ writing the Bohemia Interactive PAA (PAX) image format used in the ArmA game
 series.  The primary source of information on this format is the [Biki],
 complemented by the [PMC Editing Wiki].
 
-At the moment, this package is not feature complete.  You might want to use
-[hemtt-paa](https://github.com/BrettMayson/HEMTT/tree/main/hemtt-paa) instead.
+### Roadmap
++ [ ] Annotating PAAs at byte level
++ [ ] Decoding PAAs from:
+  + [ ] Index palette RGB
+  + [x] ARGB4444
+  + [x] ARGB1555
+  + [ ] ARGB8888
+  + [ ] AI88
+  + [ ] DXT1..DXT4
+  + [x] DXT5
++ [ ] Encoding images
 
 [Biki]: https://community.bistudio.com/wiki/PAA_File_Format
 [PMC Editing Wiki]: https://pmc.editing.wiki/doku.php?id=arma:file_formats:paa
