@@ -19,6 +19,7 @@ fn construct_app() -> clap::Command<'static> {
 			.arg(clap::arg!(png: <PNG> "PNG output path")))
 		.subcommand(clap::Command::new("info")
 			.about("Parse a PAA file and log details")
+			.arg(clap::arg!(brief: -b --brief "Do not prepend file name to output").takes_value(false))
 			.arg(clap::arg!(serialize_back: -S "Serialize PAA back in memory for debugging").takes_value(false))
 			.arg(clap::arg!(input: <INPUT> "PAA file to parse")))
 }
@@ -66,16 +67,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn command_info(matches: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
 	let mut result: PaaResult<_> = Ok(());
 	let input = matches.value_of("input").expect("INPUT required");
+	let brief = matches.is_present("brief");
+
+	let brief_prefix = if brief {
+		"".to_string()
+	}
+	else {
+		format!("{}: ", input)
+	};
 
 	let mut file = std::fs::File::open(input)?;
 	let filesize = file.metadata().expect("Could not read file metadata").len();
 	let image = PaaImage::read_from(&mut file)?;
 
-	println!("{}: File size: {} (0x{:X})", input, filesize, filesize);
-	println!("{}: PaaType: {:?}", input, image.paatype);
+	println!("{}File size: {} (0x{:X})", brief_prefix, filesize, filesize);
+	println!("{}PaaType: {:?}", brief_prefix, image.paatype);
 
 	for (pos, tagg) in image.taggs.iter().enumerate() {
-		println!("{}: Tagg #{}: {:?}", input, pos+1, tagg);
+		println!("{}Tagg #{}: {:?}", brief_prefix, pos+1, tagg);
 	};
 
 	let mipmaps = image.mipmaps.clone().into_fallible();
@@ -84,8 +93,8 @@ fn command_info(matches: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Er
 		let pos = pos + 1;
 
 		if let Ok(m) = m {
-			println!("{}: Mipmap #{}, {}x{} [{:?}], size={}",
-				input,
+			println!("{}Mipmap #{}, {}x{} [{:?}], size={}",
+				brief_prefix,
 				pos,
 				m.width,
 				m.height,
@@ -97,7 +106,7 @@ fn command_info(matches: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Er
 				result = m.clone().map(|_| ());
 			};
 
-			println!("{}: Mipmap #{} ERROR {:?}", input, pos, m);
+			println!("{}Mipmap #{} ERROR {:?}", brief_prefix, pos, m);
 		};
 	};
 
