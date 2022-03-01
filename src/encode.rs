@@ -87,3 +87,14 @@ fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<RgbaImage> {
 		_ => todo!(),
 	}
 }
+
+
+pub fn apply_swizzle_to_rgba8(swiz: &crate::ArgbSwizzle, rgba8: &mut image::RgbaImage) {
+	let mut flt = swiz.as_rgba8_filter();
+
+	for pixel in rgba8.pixels_mut() {
+		let src = pixel.channels();
+		let dst = flt(src.try_into().unwrap());
+		pixel.channels_mut().copy_from_slice(&dst)
+	};
+}

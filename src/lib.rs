@@ -531,6 +531,151 @@ impl std::fmt::Display for Bgra8888Pixel {
 }
 
 
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8", bits = "2")]
+pub enum ChannelSwizzleId {
+	#[display(fmt = "a")]
+	#[deku(id = "0b00")]
+	Alpha,
+	#[display(fmt = "r")]
+	#[deku(id = "0b01")]
+	Red,
+	#[display(fmt = "g")]
+	#[deku(id = "0b10")]
+	Green,
+	#[display(fmt = "b")]
+	#[deku(id = "0b11")]
+	Blue,
+}
+
+
+impl ChannelSwizzleId {
+	fn as_rgba_index(&self) -> usize {
+		use ChannelSwizzleId::*;
+
+		match self {
+			Red => 0,
+			Green => 1,
+			Blue => 2,
+			Alpha => 3,
+		}
+	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "tgt: ChannelSwizzleId")]
+#[display(fmt = "<{}={}>", target, data)]
+pub struct ChannelSwizzle {
+	#[deku(skip, default = "tgt")]
+	pub target: ChannelSwizzleId,
+	#[deku(pad_bits_before = "4")]
+	pub data: ChannelSwizzleData,
+}
+
+
+impl ChannelSwizzle {
+	pub fn as_subpixel_map(&self) -> Box<dyn FnMut(&[u8; 4], &mut [u8; 4])> {
+		use ChannelSwizzleData::*;
+
+		let target_idx = self.target.as_rgba_index();
+
+		match self.data {
+			Source { neg_flag: false, source } => {
+				let source_idx = source.as_rgba_index();
+				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = src[source_idx] })
+			},
+
+			Source { neg_flag: true, source } => {
+				let source_idx = source.as_rgba_index();
+				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = 0xFF - src[source_idx] })
+			},
+
+			Fill { value } => {
+				let fill_byte: u8 = match value {
+					0 => 0x00,
+					1 => 0xFF,
+					_ => unreachable!(),
+				};
+
+				Box::new(move |_: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = fill_byte })
+			},
+		}
+	}
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8", bits = "1")]
+pub enum ChannelSwizzleData {
+	#[deku(id = "0b0")]
+	Source {
+		#[deku(bits = "1")]
+		neg_flag: bool,
+		source: ChannelSwizzleId,
+	},
+
+	#[deku(id = "0b1")]
+	Fill {
+		#[deku(pad_bits_before = "2", bits = "1", map = "|field: u8| -> Result<_, DekuError> { Ok(1-field) }")]
+		value: u8
+	},
+}
+
+
+impl std::fmt::Display for ChannelSwizzleData {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		use ChannelSwizzleData::*;
+
+		match self {
+			Source { neg_flag, source } => {
+				let neg_str = if *neg_flag { "1-" } else { "" };
+				write!(f, "{}{}", neg_str, source)
+			},
+
+			Fill { value } => {
+				write!(f, "{}", value)
+			},
+		}
+	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
+pub struct ArgbSwizzle {
+	#[deku(ctx = "ChannelSwizzleId::Alpha")]
+	a: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Red")]
+	r: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Green")]
+	g: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Blue")]
+	b: ChannelSwizzle,
+}
+
+
+impl ArgbSwizzle {
+	pub fn as_rgba8_filter(&self) -> Box<dyn FnMut(&[u8; 4]) -> [u8; 4]> {
+		let mut a_flt = self.a.as_subpixel_map();
+		let mut r_flt = self.r.as_subpixel_map();
+		let mut g_flt = self.g.as_subpixel_map();
+		let mut b_flt = self.b.as_subpixel_map();
+
+		let lambda = move |src: &[u8; 4]| -> [u8; 4] {
+			let mut dst = *src;
+			a_flt(src, &mut dst);
+			r_flt(src, &mut dst);
+			g_flt(src, &mut dst);
+			b_flt(src, &mut dst);
+			dst
+		};
+
+		Box::new(lambda)
+	}
+}
+
+
 /// Metadata frame present in PAA headers.
 #[derive(Debug, Display, Clone, PartialEq)]
 pub enum Tagg {
@@ -553,9 +698,9 @@ pub enum Tagg {
 	},
 
 	/// Texture swizzle data (unknown format)
-	#[display(fmt = "{:?}", self)]
+	#[display(fmt = "Swiz {{ {} }}", swizzle)]
 	Swiz {
-		swizzle: u32
+		swizzle: ArgbSwizzle,
 	},
 
 	/// Unknown metadata
@@ -599,7 +744,7 @@ impl Tagg {
 
 			Self::Swiz { swizzle } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *swizzle);
+				bytes.extend(swizzle.to_bytes().unwrap())
 			},
 
 			Self::Proc { text } => {
@@ -689,7 +834,7 @@ impl Tagg {
 				if data.len() != 4 {
 					return Err(UnexpectedTaggDataSize);
 				}
-				let swizzle = LittleEndian::read_u32(data);
+				let (_, swizzle) = ArgbSwizzle::from_bytes((data, 0)).unwrap();
 				Ok(Self::Swiz { swizzle })
 			},
 
