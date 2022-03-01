@@ -36,6 +36,7 @@ use bohemia_compression::*;
 use static_assertions::const_assert;
 use bstr::BString;
 use segvec::SegVec;
+use deku::prelude::*;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use derive_more::{Display, Error};
 
@@ -533,35 +534,59 @@ impl PaaType {
 }
 
 
+/// The color data used in AVGCTAGG and MAXCTAGG; its byte layout is B:G:R:A.
+#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+pub struct Bgra8888Pixel {
+	b: u8,
+	g: u8,
+	r: u8,
+	a: u8,
+}
+
+
+impl std::fmt::Display for Bgra8888Pixel {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "<r={:.3}> <g={:.3}> <b={:.3}> <a={:.3}>",
+			self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0, self.a as f32 / 255.0)
+	}
+}
+
+
 /// Metadata frame present in PAA headers.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Display, Clone, PartialEq)]
 pub enum Tagg {
 	/// Average color value
+	#[display(fmt = "Avgc {{ {} }}", rgba)]
 	Avgc {
-		rgba: u32
+		rgba: Bgra8888Pixel,
 	},
 
 	/// Maximum color value
+	#[display(fmt = "Maxc {{ {} }}", rgba)]
 	Maxc {
-		rgba: u32
+		rgba: Bgra8888Pixel,
 	},
 
+	#[display(fmt = "Flag {{ {} }}", transparency)]
 	Flag {
 		/// Texture transparency type
 		transparency: Transparency
 	},
 
 	/// Texture swizzle data (unknown format)
+	#[display(fmt = "{:?}", self)]
 	Swiz {
 		swizzle: u32
 	},
 
 	/// Unknown metadata
+	#[display(fmt = "{:?}", self)]
 	Proc {
 		text: BString
 	},
 
 	/// Mipmap offsets
+	#[display(fmt = "{:?}", self)]
 	Offs {
 		offsets: Vec<u32>
 	},
@@ -580,12 +605,12 @@ impl Tagg {
 		match self {
 			Self::Avgc { rgba } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *rgba);
+				bytes.extend(rgba.to_bytes().unwrap());
 			},
 
 			Self::Maxc { rgba } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
-				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, *rgba);
+				bytes.extend(rgba.to_bytes().unwrap());
 			},
 
 			Self::Flag { transparency } => {
@@ -659,7 +684,7 @@ impl Tagg {
 				if data.len() != 4 {
 					return Err(UnexpectedTaggDataSize);
 				}
-				let rgba = LittleEndian::read_u32(data);
+				let (_, rgba) = Bgra8888Pixel::from_bytes((data, 0)).unwrap();
 				Ok(Self::Avgc { rgba })
 			},
 
@@ -667,7 +692,7 @@ impl Tagg {
 				if data.len() != 4 {
 					return Err(UnexpectedTaggDataSize);
 				}
-				let rgba = LittleEndian::read_u32(data);
+				let (_, rgba) = Bgra8888Pixel::from_bytes((data, 0)).unwrap();
 				Ok(Self::Maxc { rgba })
 			},
 
@@ -742,10 +767,13 @@ impl Tagg {
 }
 
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Display, Clone, PartialEq)]
 pub enum Transparency {
+	#[display(fmt = "<no transparency>")]
 	None,
+	#[display(fmt = "<transparent, interpolated alpha>")]
 	AlphaInterpolated,
+	#[display(fmt = "<transparent, non-interpolated alpha>")]
 	AlphaNotInterpolated,
 }
 

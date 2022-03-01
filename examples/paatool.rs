@@ -84,7 +84,7 @@ fn command_info(matches: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Er
 	println!("{}PaaType: {:?}", brief_prefix, image.paatype);
 
 	for (pos, tagg) in image.taggs.iter().enumerate() {
-		println!("{}Tagg #{}: {:?}", brief_prefix, pos+1, tagg);
+		println!("{}Tagg #{}: {}", brief_prefix, pos+1, tagg);
 	};
 
 	let mipmaps = image.mipmaps.clone().into_fallible();

@@ -13,6 +13,7 @@ encode = ["image", "squish"]
 static_assertions = "1.1.0"
 derive_more = "0.99.17"
 byteorder = "1.4.3"
+deku = "0.13.0"
 bstr = "0.2.17"
 segvec = "0.1.5"
 libc = "0.2.117"
