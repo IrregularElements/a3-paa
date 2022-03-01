@@ -51,85 +51,103 @@ pub type PaaResult<T> = std::result::Result<T, PaaError>;
 #[derive(Debug, Display, Error, Clone)]
 pub enum PaaError {
 	/// A function that reads from [`std::io::Read`] encountered early EOF.
+	#[display(fmt = "Unexpected end of input file")]
 	UnexpectedEof,
 
-	#[display(fmt = "UnexpectedIoError({:?})", _0)]
+	#[display(fmt = "Unexpected I/O error: {}", _0)]
 	UnexpectedIoError(#[error(ignore)] std::io::ErrorKind),
 
 	/// Attempted to read a PAA image with incorrect magic bytes.
-	#[display(fmt = "UnknownPaaType({:?})", _0)]
+	#[display(fmt = "Unknown PAA type: {:02x?}", _0)]
 	UnknownPaaType(#[error(ignore)] [u8; 2]),
 
 	/// Attempted to read a Tagg which does not start with the "GGAT" signature.
+	#[display(fmt = "Attempted to read a TAGG which does not start with a \"GGAT\" signature")]
 	UnexpectedTaggSignature,
 
 	/// Attempted to read a Tagg with unknown name.
-	#[display(fmt = "UnknownTaggType({:?})", _0)]
+	#[display(fmt = "Attempted to read a TAGG with unexpected name: {:02x?}", _0)]
 	UnknownTaggType(#[error(ignore)] [u8; 4]),
 
 	/// Attempted to read a Tagg with unexpected indicated payload size.
+	#[display(fmt = "Attempted to read a TAGG with unexpected indicated payload size")]
 	UnexpectedTaggDataSize,
 
 	/// Attempted to read a [`Tagg::Flag`] with unexpected transparency value.
+	#[display(fmt = "Attempted to read a FLAGTAGG with unknown transparency value: {:02x?}", _0)]
 	UnknownTransparencyValue(#[error(ignore)] u8),
 
 	/// [`PaaPalette::as_bytes`] received a palette with number of colors
 	/// overflowing a [`u16`][std::primitive::u16].
+	#[display(fmt = "Received a palette with number of colors overflowing a u16 while encoding")]
 	PaletteTooLarge,
 
 	/// Mipmap returned by [`PaaMipmap::read_from`] or
 	/// [`PaaMipmap::read_from_until_eof`] had zero width or zero height.
+	#[display(fmt = "Read an empty mipmap")]
 	EmptyMipmap,
 
 	/// Mipmap start offset (as indicated in the file) is beyond EOF.
+	#[display(fmt = "Mipmap start offset as indicated in metadata is beyond EOF")]
 	MipmapOffsetBeyondEof,
 
 	/// Some or all mipmap data (as indicated by mipmap data length) is beyond
 	/// EOF.
+	#[display(fmt = "Some or all mipmap data is beyond EOF")]
 	MipmapDataBeyondEof,
 
 	/// Input mipmap dimensions higher than 32768.
+	#[display(fmt = "Received a mipmap with one or both dimensions larger than 32768 while encoding")]
 	MipmapTooLarge,
 
 	/// Mipmap dimensions not multiple of 2 or less than 4.
+	#[display(fmt = "DXTn mipmap dimensions not multiple of 2 or less than 4")]
 	UnexpectedMipmapDimensions,
 
 	/// Uncompressed mipmap data is not of the same size as computed by
 	/// [`PaaType::predict_size`].  Enum members are width, height and
 	/// [`predict_size`][PaaType::predict_size] result.
 	#[error(ignore)]
-	#[display(fmt = "UnexpectedMipmapDataSize({}, {}, {})", _0, _1, _2)]
+	#[display(fmt = "Uncompressed mipmap data is not the same size as computed from dimensions (predict_size({}x{}) = {})", _0, _1, _2)]
 	UnexpectedMipmapDataSize(u16, u16, usize),
 
 	/// The [`PaaImage`] passed to [`PaaImage::as_bytes`] contained a
 	/// [fallible][PaaMipmapContainer::Fallible] container variant.
+	#[display(fmt = "The PaaImage passed to PaaImage::as_bytes contained a fallible container variant")]
 	FallibleMipmapInput,
 
 	/// A checked arithmetic operation triggered an unexpected under/overflow.
+	#[display(fmt = "A checked arithmetic operation triggered an unexpected under/overflow")]
 	CorruptedData,
 
 	/// An error occurred while uncompressing RLE data (this likely means the
 	/// data is incomplete).
+	#[display(fmt = "An error occurred while uncompressing RLE data (compressed data likely truncated)")]
 	RleError(BcError),
 
 	/// DXT-LZO de/compression failed.
+	#[display(fmt = "DXT-LZO decompression failed: {}", _0)]
 	LzoError(/*MinilzoError*/ #[error(ignore)] String),
 
 	/// LZSS decompression failed.
+	#[display(fmt = "LZSS decompression failed")]
 	LzssDecompressError,
 
 	/// [`PaaMipmap::read_from`] was passed an LZSS-compressed [`PaaMipmap`]
 	/// with incorrect additive checksum, or LZSS decompression resulted in
 	/// incorrect data.
+	#[display(fmt = "LZSS checksum present in mipmap differs from the checksum computed on uncompressed data")]
 	LzssWrongChecksum,
 
 	/// A function that writes to [`std::io::Write`] encountered an I/O error.
-	#[display(fmt = "UnexpectedWriteError({:?})", _0)]
+	#[display(fmt = "A function that writes to std::io::Write encountered an I/O error: ({:?})", _0)]
 	UnexpectedWriteError(#[error(ignore)] std::io::ErrorKind),
 
 	/// Attempted to write a PAA image with more than 16 mipmaps.
+	#[display(fmt = "Attempted to write a PAA image with more than 16 mipmaps: {}", _0)]
 	TooManyMipmaps(#[error(ignore)] usize),
 
+	#[display(fmt = "Mipmap index out of range")]
 	MipmapIndexOutOfRange,
 }
 
