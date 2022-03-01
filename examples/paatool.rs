@@ -127,7 +127,7 @@ fn command_paa2png(matches: &clap::ArgMatches) -> Result<(), Box<dyn std::error:
 	let mip_idx = matches.value_of("mipmap").unwrap_or("1").parse::<usize>().expect("Could not parse -m <mipmap>");
 
 	let mut paa_file = std::fs::File::open(paa_path)?;
-	let image = PaaImage::read_from(&mut paa_file)?.into_infallible()?;
+	let image = PaaImage::read_from(&mut paa_file)?;
 	let mipmap_count = image.mipmaps.len();
 
 	if !(1..=mipmap_count).contains(&mip_idx) {
