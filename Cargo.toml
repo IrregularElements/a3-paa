@@ -12,10 +12,10 @@ byteorder = "1.4.3"
 deku = "0.13.0"
 bstr = "0.2.17"
 segvec = "0.1.5"
-libc = "0.2.117"
+libc = "0.2.119"
 minilzo-rs = "0.6.0"
 log = "0.4.14"
-image = "0.23.14"
+image = "0.24.1"
 squish = "2.0.0-beta1"
 
 [dependencies.bohemia-compression]
@@ -24,9 +24,9 @@ rev = "18cfdedfa530ea4d5468154a1c2210445bd751e2"
 
 [dev-dependencies]
 anyhow = { version = "1.0.55", features = ["backtrace"] }
-fern = "0.5.9"
+fern = "0.6.0"
 chrono = "0.4.19"
-clap = { version = "3.1.1", features = ["cargo"] }
+clap = { version = "3.1.5", features = ["cargo"] }
 
 [[example]]
 name = "paatool"
