@@ -261,8 +261,8 @@ impl PaaImage {
 		let paatype_bytes: [u8; 2] = read_exact_buffered(input, 2)?
 			.try_into()
 			.expect("Could not convert paatype_bytes (this is a bug)");
-		let paatype = PaaType::from_bytes(&paatype_bytes)
-			.ok_or(UnknownPaaType(paatype_bytes))?;
+		let (_, paatype) = PaaType::from_bytes((&paatype_bytes, 0))
+			.map_err(|_| UnknownPaaType(paatype_bytes))?;
 
 		debug_trace!("PaaType: {:?}", paatype);
 
@@ -311,7 +311,7 @@ impl PaaImage {
 		let palette = PaaPalette::read_from(input)?;
 
 		if palette.is_some() {
-			return Err(UnknownPaaType(PaaType::PAXTYPE_IPAL_BYTES));
+			return Err(UnknownPaaType(PaaType::IndexPalette.to_bytes().unwrap().try_into().unwrap()));
 		}
 
 		let stream_position = input.stream_position().unwrap();
@@ -360,7 +360,7 @@ impl PaaImage {
 	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		let mut buf: Vec<u8> = Vec::with_capacity(10_000_000);
 
-		buf.extend(self.paatype.as_bytes());
+		buf.extend(self.paatype.to_bytes().unwrap());
 
 		for ref t in self.taggs.iter() {
 			if let Tagg::Offs { .. } = t {
@@ -433,35 +433,47 @@ impl PaaImage {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u16", endian = "little")]
 pub enum PaaType {
+	// See `int __stdcall sub_4276E0(void *Block, int)` (ImageToPAA v1.0.0.3).
+	#[deku(id = "0xFF_01")]
 	Dxt1,
 
 	#[deprecated]
+	#[deku(id = "0xFF_02")]
 	Dxt2,
 
 	#[deprecated]
+	#[deku(id = "0xFF_03")]
 	Dxt3,
 
 	#[deprecated]
+	#[deku(id = "0xFF_04")]
 	Dxt4,
 
+	#[deku(id = "0xFF_05")]
 	Dxt5,
 
 	/// RGBA 4:4:4:4
+	#[deku(id = "0x44_44")]
 	Argb4444,
 
 	/// RGBA 5:5:5:1
+	#[deku(id = "0x15_55")]
 	Argb1555,
 
 	/// RGBA 8:8:8:8
+	#[deku(id = "0x88_88")]
 	Argb8888,
 
 	/// 8 bits alpha, 8 bits grayscale
+	#[deku(id = "0x80_80")]
 	Ai88,
 
 	/// 1 byte (offset into the index palette, which contains BGR 8:8:8)
 	#[deprecated = "[TODO] Index palette format is not implemented"]
+	#[deku(id = "0x47_47")]
 	IndexPalette,
 }
 
@@ -474,54 +486,6 @@ impl Default for PaaType {
 
 
 impl PaaType {
-	// See `int __stdcall sub_4276E0(void *Block, int)` (ImageToPAA v1.0.0.3).
-	const PAXTYPE_DXT1_BYTES: [u8; 2] = [0x01, 0xFF];
-	const PAXTYPE_DXT2_BYTES: [u8; 2] = [0x02, 0xFF];
-	const PAXTYPE_DXT3_BYTES: [u8; 2] = [0x03, 0xFF];
-	const PAXTYPE_DXT4_BYTES: [u8; 2] = [0x04, 0xFF];
-	const PAXTYPE_DXT5_BYTES: [u8; 2] = [0x05, 0xFF];
-	const PAXTYPE_RGB4_BYTES: [u8; 2] = [0x44, 0x44];
-	const PAXTYPE_RGB5_BYTES: [u8; 2] = [0x55, 0x15];
-	const PAXTYPE_RGB8_BYTES: [u8; 2] = [0x88, 0x88];
-	const PAXTYPE_GRAY_BYTES: [u8; 2] = [0x80, 0x80];
-	const PAXTYPE_IPAL_BYTES: [u8; 2] = [0x47, 0x47];
-
-
-	pub fn from_bytes(value: &[u8; 2]) -> Option<Self> {
-		match *value {
-			Self::PAXTYPE_DXT1_BYTES => Some(Self::Dxt1),
-			Self::PAXTYPE_DXT2_BYTES => Some(Self::Dxt2),
-			Self::PAXTYPE_DXT3_BYTES => Some(Self::Dxt3),
-			Self::PAXTYPE_DXT4_BYTES => Some(Self::Dxt4),
-			Self::PAXTYPE_DXT5_BYTES => Some(Self::Dxt5),
-			Self::PAXTYPE_RGB4_BYTES => Some(Self::Argb4444),
-			Self::PAXTYPE_RGB5_BYTES => Some(Self::Argb1555),
-			Self::PAXTYPE_RGB8_BYTES => Some(Self::Argb8888),
-			Self::PAXTYPE_GRAY_BYTES => Some(Self::Ai88),
-			Self::PAXTYPE_IPAL_BYTES => Some(Self::IndexPalette),
-			_ => None,
-		}
-	}
-
-
-	pub const fn as_bytes(&self) -> [u8; 2] {
-		use PaaType::*;
-
-		match self {
-			Dxt1 => Self::PAXTYPE_DXT1_BYTES,
-			Dxt2 => Self::PAXTYPE_DXT2_BYTES,
-			Dxt3 => Self::PAXTYPE_DXT3_BYTES,
-			Dxt4 => Self::PAXTYPE_DXT4_BYTES,
-			Dxt5 => Self::PAXTYPE_DXT5_BYTES,
-			Argb4444 => Self::PAXTYPE_RGB4_BYTES,
-			Argb1555 => Self::PAXTYPE_RGB5_BYTES,
-			Argb8888 => Self::PAXTYPE_RGB8_BYTES,
-			Ai88 => Self::PAXTYPE_GRAY_BYTES,
-			IndexPalette => Self::PAXTYPE_IPAL_BYTES,
-		}
-	}
-
-
 	/// Calculates the size of uncompressed mipmap data from its width and
 	/// height.
 	pub const fn predict_size(&self, width: u16, height: u16) -> usize {
@@ -630,8 +594,7 @@ impl Tagg {
 
 			Self::Flag { transparency } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
-				let trans = <u8 as From<&Transparency>>::from(transparency);
-				bytes.extend([trans, 0, 0, 0]);
+				bytes.extend(transparency.to_bytes().unwrap());
 			},
 
 			Self::Swiz { swizzle } => {
@@ -716,9 +679,8 @@ impl Tagg {
 					return Err(UnexpectedTaggDataSize);
 				}
 
-				let trans = data[0];
-				let transparency: Transparency = trans.try_into()
-					.map_err(|_| UnknownTransparencyValue(trans))?;
+				let (_, transparency) = Transparency::from_bytes((data, 0))
+					.map_err(|_| UnknownTransparencyValue(data[0]))?;
 
 				Ok(Self::Flag { transparency })
 			},
@@ -782,13 +744,17 @@ impl Tagg {
 }
 
 
-#[derive(Debug, Display, Clone, PartialEq)]
+#[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
 pub enum Transparency {
 	#[display(fmt = "<no transparency>")]
+	#[deku(id = "0x00")]
 	None,
 	#[display(fmt = "<transparent, interpolated alpha>")]
+	#[deku(id = "0x01")]
 	AlphaInterpolated,
 	#[display(fmt = "<transparent, non-interpolated alpha>")]
+	#[deku(id = "0x02")]
 	AlphaNotInterpolated,
 }
 
@@ -796,33 +762,6 @@ pub enum Transparency {
 impl Default for Transparency {
 	fn default() -> Self {
 		Transparency::AlphaInterpolated
-	}
-}
-
-
-impl TryFrom<u8> for Transparency {
-	type Error = ();
-
-	fn try_from(value: u8) -> Result<Self, Self::Error> {
-		use Transparency::*;
-
-		match value {
-			0 => Ok(None),
-			1 => Ok(AlphaInterpolated),
-			2 => Ok(AlphaNotInterpolated),
-			_ => Err(()),
-		}
-	}
-}
-
-
-impl From<&Transparency> for u8 {
-	fn from(value: &Transparency) -> Self {
-		match value {
-			Transparency::None => 0,
-			Transparency::AlphaInterpolated => 1,
-			Transparency::AlphaNotInterpolated => 2,
-		}
 	}
 }
 
