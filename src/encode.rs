@@ -2,7 +2,7 @@ use crate::*;
 use crate::pixconv::*;
 use crate::PaaError::*;
 
-use image::{RgbaImage, DynamicImage};
+use image::{RgbaImage, Pixel};
 
 
 pub struct PaaDecoder {
@@ -16,7 +16,7 @@ impl PaaDecoder {
 	}
 
 
-	pub fn decode_nth(&self, index: usize) -> PaaResult<DynamicImage> {
+	pub fn decode_nth(&self, index: usize) -> PaaResult<RgbaImage> {
 		let mipmap = match &self.paa.mipmaps {
 			PaaMipmapContainer::Fallible(v) => {
 				v.get(index)
@@ -35,13 +35,13 @@ impl PaaDecoder {
 	}
 
 
-	pub fn decode_first(&self) -> PaaResult<DynamicImage> {
+	pub fn decode_first(&self) -> PaaResult<RgbaImage> {
 		self.decode_nth(0)
 	}
 }
 
 
-fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<DynamicImage> {
+fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<RgbaImage> {
 	use PaaType::*;
 
 	if mipmap.is_empty() {
@@ -63,25 +63,25 @@ fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<DynamicImage> {
 			format.decompress(&mipmap.data, mipmap.width.into(), mipmap.height.into(), &mut buffer);
 
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), buffer).unwrap();
-			Ok(DynamicImage::ImageRgba8(image))
+			Ok(image)
 		},
 
 		Argb4444 => {
 			let data = argb4444_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
-			Ok(DynamicImage::ImageRgba8(image))
+			Ok(image)
 		},
 
 		Argb1555 => {
 			let data = argb1555_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
-			Ok(DynamicImage::ImageRgba8(image))
+			Ok(image)
 		},
 
 		Argb8888 => {
 			let data = argb8888_to_rgba8888(&mipmap.data);
 			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
-			Ok(DynamicImage::ImageRgba8(image))
+			Ok(image)
 		},
 
 		_ => todo!(),
