@@ -5,7 +5,6 @@ use crate::PaaError::*;
 use image::{RgbaImage, DynamicImage};
 
 
-#[cfg_attr(doc, doc(cfg(feature = "encode")))]
 pub struct PaaDecoder {
 	paa: PaaImage,
 }

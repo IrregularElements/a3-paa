@@ -19,11 +19,8 @@
 #![doc = include_str!("../README.md")]
 
 
-#[cfg(feature = "encode")]
 mod pixconv;
-#[cfg(feature = "encode")]
 mod encode;
-#[cfg(feature = "encode")]
 pub use crate::encode::*;
 
 

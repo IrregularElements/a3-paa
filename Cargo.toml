@@ -5,10 +5,6 @@ version = "0.0.1-dev"
 description = "Read and write the Bohemia Interactive PAA image format"
 rust-version = "1.56"
 
-[features]
-default = ["encode"]
-encode = ["image", "squish"]
-
 [dependencies]
 static_assertions = "1.1.0"
 derive_more = "0.99.17"
@@ -19,8 +15,8 @@ segvec = "0.1.5"
 libc = "0.2.117"
 minilzo-rs = "0.6.0"
 log = "0.4.14"
-image = { version = "0.23.14", optional = true }
-squish = { version = "2.0.0-beta1", optional = true }
+image = "0.23.14"
+squish = "2.0.0-beta1"
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
