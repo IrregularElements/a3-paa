@@ -24,20 +24,34 @@ use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
-use bohemia_compression::*;
 use static_assertions::const_assert;
-use bstr::BString;
-use segvec::SegVec;
+use derive_more::{Display, Error};
 use deku::prelude::*;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
-use derive_more::{Display, Error};
+#[cfg(test)] use byteorder::BigEndian;
+use bstr::BString;
+use segvec::SegVec;
 use image::{RgbaImage, Pixel};
 use squish::Format as SquishFormat;
+use bohemia_compression::*;
 
 use PaaError::*;
 
-#[cfg(test)]
-use byteorder::BigEndian;
+
+
+macro_rules! debug_trace {
+	($fmt:expr) => {
+		if cfg!(debug_assertions) {
+			log::trace!(concat!("debug_trace: ", $fmt));
+		};
+	};
+
+	($fmt:expr, $($arg:tt)*) => {
+		if cfg!(debug_assertions) {
+			log::trace!(concat!("debug_trace: ", $fmt), $($arg)*);
+		};
+	};
+}
 
 
 /// [`std::result::Result`] parameterized with [`PaaError`].
@@ -164,21 +178,6 @@ impl From<std::io::Error> for PaaError {
 			},
 		}
 	}
-}
-
-
-macro_rules! debug_trace {
-	($fmt:expr) => {
-		if cfg!(debug_assertions) {
-			log::trace!(concat!("debug_trace: ", $fmt));
-		};
-	};
-
-	($fmt:expr, $($arg:tt)*) => {
-		if cfg!(debug_assertions) {
-			log::trace!(concat!("debug_trace: ", $fmt), $($arg)*);
-		};
-	};
 }
 
 
@@ -434,169 +433,6 @@ impl PaaType {
 }
 
 
-/// The color data used in AVGCTAGG and MAXCTAGG; its byte layout is B:G:R:A.
-#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-pub struct Bgra8888Pixel {
-	b: u8,
-	g: u8,
-	r: u8,
-	a: u8,
-}
-
-
-impl std::fmt::Display for Bgra8888Pixel {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "<r={:.3}> <g={:.3}> <b={:.3}> <a={:.3}>",
-			self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0, self.a as f32 / 255.0)
-	}
-}
-
-
-#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = "2")]
-pub enum ChannelSwizzleId {
-	#[display(fmt = "a")]
-	#[deku(id = "0b00")]
-	Alpha,
-	#[display(fmt = "r")]
-	#[deku(id = "0b01")]
-	Red,
-	#[display(fmt = "g")]
-	#[deku(id = "0b10")]
-	Green,
-	#[display(fmt = "b")]
-	#[deku(id = "0b11")]
-	Blue,
-}
-
-
-impl ChannelSwizzleId {
-	fn as_rgba_index(&self) -> usize {
-		use ChannelSwizzleId::*;
-
-		match self {
-			Red => 0,
-			Green => 1,
-			Blue => 2,
-			Alpha => 3,
-		}
-	}
-}
-
-
-#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-#[deku(ctx = "tgt: ChannelSwizzleId")]
-#[display(fmt = "<{}={}>", target, data)]
-pub struct ChannelSwizzle {
-	#[deku(skip, default = "tgt")]
-	pub target: ChannelSwizzleId,
-	#[deku(pad_bits_before = "4")]
-	pub data: ChannelSwizzleData,
-}
-
-
-impl ChannelSwizzle {
-	pub fn as_subpixel_map(&self) -> Box<dyn FnMut(&[u8; 4], &mut [u8; 4])> {
-		use ChannelSwizzleData::*;
-
-		let target_idx = self.target.as_rgba_index();
-
-		match self.data {
-			Source { neg_flag: false, source } => {
-				let source_idx = source.as_rgba_index();
-				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = src[source_idx] })
-			},
-
-			Source { neg_flag: true, source } => {
-				let source_idx = source.as_rgba_index();
-				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = 0xFF - src[source_idx] })
-			},
-
-			Fill { value } => {
-				let fill_byte: u8 = match value {
-					0 => 0x00,
-					1 => 0xFF,
-					_ => unreachable!(),
-				};
-
-				Box::new(move |_: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = fill_byte })
-			},
-		}
-	}
-}
-
-
-#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = "1")]
-pub enum ChannelSwizzleData {
-	#[deku(id = "0b0")]
-	Source {
-		#[deku(bits = "1")]
-		neg_flag: bool,
-		source: ChannelSwizzleId,
-	},
-
-	#[deku(id = "0b1")]
-	Fill {
-		#[deku(pad_bits_before = "2", bits = "1", map = "|field: u8| -> Result<_, DekuError> { Ok(1-field) }")]
-		value: u8
-	},
-}
-
-
-impl std::fmt::Display for ChannelSwizzleData {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		use ChannelSwizzleData::*;
-
-		match self {
-			Source { neg_flag, source } => {
-				let neg_str = if *neg_flag { "1-" } else { "" };
-				write!(f, "{}{}", neg_str, source)
-			},
-
-			Fill { value } => {
-				write!(f, "{}", value)
-			},
-		}
-	}
-}
-
-
-#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-#[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
-pub struct ArgbSwizzle {
-	#[deku(ctx = "ChannelSwizzleId::Alpha")]
-	a: ChannelSwizzle,
-	#[deku(ctx = "ChannelSwizzleId::Red")]
-	r: ChannelSwizzle,
-	#[deku(ctx = "ChannelSwizzleId::Green")]
-	g: ChannelSwizzle,
-	#[deku(ctx = "ChannelSwizzleId::Blue")]
-	b: ChannelSwizzle,
-}
-
-
-impl ArgbSwizzle {
-	pub fn as_rgba8_filter(&self) -> Box<dyn FnMut(&[u8; 4]) -> [u8; 4]> {
-		let mut a_flt = self.a.as_subpixel_map();
-		let mut r_flt = self.r.as_subpixel_map();
-		let mut g_flt = self.g.as_subpixel_map();
-		let mut b_flt = self.b.as_subpixel_map();
-
-		let lambda = move |src: &[u8; 4]| -> [u8; 4] {
-			let mut dst = *src;
-			a_flt(src, &mut dst);
-			r_flt(src, &mut dst);
-			g_flt(src, &mut dst);
-			b_flt(src, &mut dst);
-			dst
-		};
-
-		Box::new(lambda)
-	}
-}
-
-
 /// Metadata frame present in PAA headers.
 #[derive(Debug, Display, Clone, PartialEq)]
 pub enum Tagg {
@@ -806,28 +642,6 @@ impl Tagg {
 	/// file (e.g. "SFFO").
 	pub fn is_valid_taggname(name: &str) -> bool {
 		matches!(name, "CGVA" | "CXAM" | "GALF" | "ZIWS" | "CORP" | "SFFO")
-	}
-}
-
-
-#[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
-pub enum Transparency {
-	#[display(fmt = "<no transparency>")]
-	#[deku(id = "0x00")]
-	None,
-	#[display(fmt = "<transparent, interpolated alpha>")]
-	#[deku(id = "0x01")]
-	AlphaInterpolated,
-	#[display(fmt = "<transparent, non-interpolated alpha>")]
-	#[deku(id = "0x02")]
-	AlphaNotInterpolated,
-}
-
-
-impl Default for Transparency {
-	fn default() -> Self {
-		Transparency::AlphaInterpolated
 	}
 }
 
@@ -1105,6 +919,191 @@ impl PaaMipmap {
 }
 
 
+/// The color data used in AVGCTAGG and MAXCTAGG; its byte layout is B:G:R:A.
+#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+pub struct Bgra8888Pixel {
+	b: u8,
+	g: u8,
+	r: u8,
+	a: u8,
+}
+
+
+impl std::fmt::Display for Bgra8888Pixel {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "<r={:.3}> <g={:.3}> <b={:.3}> <a={:.3}>",
+			self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0, self.a as f32 / 255.0)
+	}
+}
+
+
+#[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
+pub enum Transparency {
+	#[display(fmt = "<no transparency>")]
+	#[deku(id = "0x00")]
+	None,
+	#[display(fmt = "<transparent, interpolated alpha>")]
+	#[deku(id = "0x01")]
+	AlphaInterpolated,
+	#[display(fmt = "<transparent, non-interpolated alpha>")]
+	#[deku(id = "0x02")]
+	AlphaNotInterpolated,
+}
+
+
+impl Default for Transparency {
+	fn default() -> Self {
+		Transparency::AlphaInterpolated
+	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
+pub struct ArgbSwizzle {
+	#[deku(ctx = "ChannelSwizzleId::Alpha")]
+	a: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Red")]
+	r: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Green")]
+	g: ChannelSwizzle,
+	#[deku(ctx = "ChannelSwizzleId::Blue")]
+	b: ChannelSwizzle,
+}
+
+
+impl ArgbSwizzle {
+	pub fn as_rgba8_filter(&self) -> Box<dyn FnMut(&[u8; 4]) -> [u8; 4]> {
+		let mut a_flt = self.a.as_subpixel_map();
+		let mut r_flt = self.r.as_subpixel_map();
+		let mut g_flt = self.g.as_subpixel_map();
+		let mut b_flt = self.b.as_subpixel_map();
+
+		let lambda = move |src: &[u8; 4]| -> [u8; 4] {
+			let mut dst = *src;
+			a_flt(src, &mut dst);
+			r_flt(src, &mut dst);
+			g_flt(src, &mut dst);
+			b_flt(src, &mut dst);
+			dst
+		};
+
+		Box::new(lambda)
+	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "tgt: ChannelSwizzleId")]
+#[display(fmt = "<{}={}>", target, data)]
+pub struct ChannelSwizzle {
+	#[deku(skip, default = "tgt")]
+	pub target: ChannelSwizzleId,
+	#[deku(pad_bits_before = "4")]
+	pub data: ChannelSwizzleData,
+}
+
+
+impl ChannelSwizzle {
+	pub fn as_subpixel_map(&self) -> Box<dyn FnMut(&[u8; 4], &mut [u8; 4])> {
+		use ChannelSwizzleData::*;
+
+		let target_idx = self.target.as_rgba_index();
+
+		match self.data {
+			Source { neg_flag: false, source } => {
+				let source_idx = source.as_rgba_index();
+				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = src[source_idx] })
+			},
+
+			Source { neg_flag: true, source } => {
+				let source_idx = source.as_rgba_index();
+				Box::new(move |src: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = 0xFF - src[source_idx] })
+			},
+
+			Fill { value } => {
+				let fill_byte: u8 = match value {
+					0 => 0x00,
+					1 => 0xFF,
+					_ => unreachable!(),
+				};
+
+				Box::new(move |_: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = fill_byte })
+			},
+		}
+	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8", bits = "2")]
+pub enum ChannelSwizzleId {
+	#[display(fmt = "a")]
+	#[deku(id = "0b00")]
+	Alpha,
+	#[display(fmt = "r")]
+	#[deku(id = "0b01")]
+	Red,
+	#[display(fmt = "g")]
+	#[deku(id = "0b10")]
+	Green,
+	#[display(fmt = "b")]
+	#[deku(id = "0b11")]
+	Blue,
+}
+
+
+impl ChannelSwizzleId {
+	fn as_rgba_index(&self) -> usize {
+		use ChannelSwizzleId::*;
+
+		match self {
+			Red => 0,
+			Green => 1,
+			Blue => 2,
+			Alpha => 3,
+		}
+	}
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8", bits = "1")]
+pub enum ChannelSwizzleData {
+	#[deku(id = "0b0")]
+	Source {
+		#[deku(bits = "1")]
+		neg_flag: bool,
+		source: ChannelSwizzleId,
+	},
+
+	#[deku(id = "0b1")]
+	Fill {
+		#[deku(pad_bits_before = "2", bits = "1", map = "|field: u8| -> Result<_, DekuError> { Ok(1-field) }")]
+		value: u8
+	},
+}
+
+
+impl std::fmt::Display for ChannelSwizzleData {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		use ChannelSwizzleData::*;
+
+		match self {
+			Source { neg_flag, source } => {
+				let neg_str = if *neg_flag { "1-" } else { "" };
+				write!(f, "{}{}", neg_str, source)
+			},
+
+			Fill { value } => {
+				write!(f, "{}", value)
+			},
+		}
+	}
+}
+
+
 /// The algorithm compressing the data of a given mipmap.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PaaMipmapCompression {
@@ -1115,6 +1114,34 @@ pub enum PaaMipmapCompression {
 	Lzss,
 
 	RleBlocks,
+}
+
+
+pub struct PaaDecoder {
+	paa: PaaImage,
+}
+
+
+impl PaaDecoder {
+	pub fn from_paa(paa: PaaImage) -> Self {
+		Self { paa }
+	}
+
+
+	pub fn decode_nth(&self, index: usize) -> PaaResult<RgbaImage> {
+		let mipmap = self.paa.mipmaps
+			.get(index)
+			.ok_or(MipmapIndexOutOfRange)?
+			.as_ref()
+			.map_err(|e| e.clone())?;
+
+		decode_mipmap(mipmap)
+	}
+
+
+	pub fn decode_first(&self) -> PaaResult<RgbaImage> {
+		self.decode_nth(0)
+	}
 }
 
 
@@ -1191,34 +1218,6 @@ fn decompress_lzo_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>> {
 fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 	let mut lzo = minilzo_rs::LZO::init().unwrap();
 	lzo.compress(input).map_err(|e| LzoError(format!("{:?}", e)))
-}
-
-
-pub struct PaaDecoder {
-	paa: PaaImage,
-}
-
-
-impl PaaDecoder {
-	pub fn from_paa(paa: PaaImage) -> Self {
-		Self { paa }
-	}
-
-
-	pub fn decode_nth(&self, index: usize) -> PaaResult<RgbaImage> {
-		let mipmap = self.paa.mipmaps
-			.get(index)
-			.ok_or(MipmapIndexOutOfRange)?
-			.as_ref()
-			.map_err(|e| e.clone())?;
-
-		decode_mipmap(mipmap)
-	}
-
-
-	pub fn decode_first(&self) -> PaaResult<RgbaImage> {
-		self.decode_nth(0)
-	}
 }
 
 
