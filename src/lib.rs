@@ -19,11 +19,6 @@
 #![doc = include_str!("../README.md")]
 
 
-mod pixconv;
-mod encode;
-pub use crate::encode::*;
-
-
 use std::fmt::Debug;
 use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
@@ -36,6 +31,8 @@ use segvec::SegVec;
 use deku::prelude::*;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use derive_more::{Display, Error};
+use image::{RgbaImage, Pixel};
+use squish::Format as SquishFormat;
 
 use PaaError::*;
 
@@ -1270,4 +1267,165 @@ fn decompress_lzo_slice(input: &[u8], dst_len: usize) -> PaaResult<Vec<u8>> {
 fn compress_lzo_slice(input: &[u8]) -> PaaResult<Vec<u8>> {
 	let mut lzo = minilzo_rs::LZO::init().unwrap();
 	lzo.compress(input).map_err(|e| LzoError(format!("{:?}", e)))
+}
+
+
+pub struct PaaDecoder {
+	paa: PaaImage,
+}
+
+
+impl PaaDecoder {
+	pub fn from_paa(paa: PaaImage) -> Self {
+		Self { paa }
+	}
+
+
+	pub fn decode_nth(&self, index: usize) -> PaaResult<RgbaImage> {
+		let mipmap = match &self.paa.mipmaps {
+			PaaMipmapContainer::Fallible(v) => {
+				v.get(index)
+					.ok_or(MipmapIndexOutOfRange)?
+					.as_ref()
+					.map_err(|e| e.clone())?
+			},
+
+			PaaMipmapContainer::Infallible(v) => {
+				v.get(index)
+					.ok_or(MipmapIndexOutOfRange)?
+			},
+		};
+
+		decode_mipmap(mipmap)
+	}
+
+
+	pub fn decode_first(&self) -> PaaResult<RgbaImage> {
+		self.decode_nth(0)
+	}
+}
+
+
+fn decode_mipmap(mipmap: &PaaMipmap) -> PaaResult<RgbaImage> {
+	use PaaType::*;
+
+	if mipmap.is_empty() {
+		return Err(EmptyMipmap);
+	};
+
+	match mipmap.paatype {
+		paatype @ (Dxt1 | Dxt2 | Dxt3 | Dxt4 | Dxt5) => {
+			let (comp_ratio, format) = match &paatype {
+				Dxt1 => (8, SquishFormat::Bc1),
+				Dxt2 => (4, SquishFormat::Bc2),
+				Dxt3 => (4, SquishFormat::Bc2),
+				Dxt4 => (4, SquishFormat::Bc3),
+				Dxt5 => (4, SquishFormat::Bc3),
+				_ => unreachable!(),
+			};
+
+			let mut buffer = vec![0u8; mipmap.data.len() * comp_ratio];
+			format.decompress(&mipmap.data, mipmap.width.into(), mipmap.height.into(), &mut buffer);
+
+			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), buffer).unwrap();
+			Ok(image)
+		},
+
+		Argb4444 => {
+			let data = argb4444_to_rgba8888(&mipmap.data);
+			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
+			Ok(image)
+		},
+
+		Argb1555 => {
+			let data = argb1555_to_rgba8888(&mipmap.data);
+			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
+			Ok(image)
+		},
+
+		Argb8888 => {
+			let data = argb8888_to_rgba8888(&mipmap.data);
+			let image = RgbaImage::from_vec(mipmap.width.into(), mipmap.height.into(), data).unwrap();
+			Ok(image)
+		},
+
+		_ => todo!(),
+	}
+}
+
+
+pub fn apply_swizzle_to_rgba8(swiz: &crate::ArgbSwizzle, rgba8: &mut image::RgbaImage) {
+	let mut flt = swiz.as_rgba8_filter();
+
+	for pixel in rgba8.pixels_mut() {
+		let src = pixel.channels();
+		let dst = flt(src.try_into().unwrap());
+		pixel.channels_mut().copy_from_slice(&dst)
+	};
+}
+
+
+
+pub(crate) fn argb4444_to_rgba8888(data4: &[u8]) -> Vec<u8> {
+	assert_eq!(data4.len() % 2, 0, "Truncated ARGB4444 data in input");
+
+	let mut result = Vec::with_capacity(data4.len()*2);
+
+	for pixel in data4.chunks(2) {
+		let pixel = LittleEndian::read_u16(pixel).to_be_bytes();
+		let pixel = &pixel;
+
+		let a: u8 = pixel[0] >> 4;
+		let r: u8 = pixel[0] & 0x0F;
+		let g: u8 = pixel[1] >> 4;
+		let b: u8 = pixel[1] & 0x0F;
+
+		let r: u8 = ((r as u16 * 0xFF + 0x1) / 0x0F) as u8;
+		let g: u8 = ((g as u16 * 0xFF + 0x1) / 0x0F) as u8;
+		let b: u8 = ((b as u16 * 0xFF + 0x1) / 0x0F) as u8;
+		let a: u8 = ((a as u16 * 0xFF + 0x1) / 0x0F) as u8;
+
+		result.extend([r, g, b, a]);
+	};
+
+	result
+}
+
+
+pub(crate) fn argb1555_to_rgba8888(data5: &[u8]) -> Vec<u8> {
+	assert_eq!(data5.len() % 2, 0, "Truncated ARGB1555 data in input");
+
+	let mut result = Vec::with_capacity(data5.len()*2);
+
+	for pixel in data5.chunks(2) {
+		let pixel = LittleEndian::read_u16(pixel).to_be_bytes();
+		let pixel = &pixel;
+
+		let a: u8 = pixel[0] >> 7;
+		let r: u8 = (pixel[0] >> 2) & 0x1F;
+		let g: u8 = (pixel[0] << 3 | pixel[1] >> 5) & 0x1F;
+		let b: u8 = pixel[1] & 0x1F;
+
+		let r: u8 = ((r as u16 * 0xFF + 0xF) / 0x1F) as u8;
+		let g: u8 = ((g as u16 * 0xFF + 0xF) / 0x1F) as u8;
+		let b: u8 = ((b as u16 * 0xFF + 0xF) / 0x1F) as u8;
+		let a: u8 = a * 0xFF;
+
+		result.extend([r, g, b, a]);
+	};
+
+	result
+}
+
+
+pub(crate) fn argb8888_to_rgba8888(data8: &[u8]) -> Vec<u8> {
+	assert_eq!(data8.len() % 4, 0, "Truncated ARGB8888 data in input");
+
+	let mut result = Vec::with_capacity(data8.len());
+
+	for pixel in data8.chunks(4) {
+		result.extend(pixel.iter().rev());
+	};
+
+	result
 }
