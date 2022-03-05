@@ -26,6 +26,7 @@ use std::default::Default;
 
 use static_assertions::const_assert;
 use derive_more::{Display, Error};
+#[cfg(feature = "fuzz")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
 use deku::prelude::*;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 #[cfg(test)] use byteorder::BigEndian;
@@ -354,6 +355,7 @@ impl PaaImage {
 
 
 #[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[deku(type = "u16", endian = "little")]
 pub enum PaaType {
 	// See `int __stdcall sub_4276E0(void *Block, int)` (ImageToPAA v1.0.0.3).
@@ -463,7 +465,7 @@ pub enum Tagg {
 	/// Unknown metadata
 	#[display(fmt = "{:?}", self)]
 	Proc {
-		text: BString
+		code: TextureMacro,
 	},
 
 	/// Mipmap offsets
@@ -504,10 +506,10 @@ impl Tagg {
 				bytes.extend(swizzle.to_bytes().unwrap())
 			},
 
-			Self::Proc { text } => {
-				let len = (text[..]).len() as u32;
+			Self::Proc { code } => {
+				let len = (code.text[..]).len() as u32;
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, len);
-				bytes.extend(&text[..]);
+				bytes.extend(&code.text[..]);
 			},
 
 			Self::Offs { offsets } => {
@@ -597,7 +599,7 @@ impl Tagg {
 
 			"CORP" => {
 				let text = BString::from(data);
-				Ok(Self::Proc { text })
+				Ok(Self::Proc { code: TextureMacro { text } })
 			},
 
 			"SFFO" => {
@@ -642,6 +644,57 @@ impl Tagg {
 	/// file (e.g. "SFFO").
 	pub fn is_valid_taggname(name: &str) -> bool {
 		matches!(name, "CGVA" | "CXAM" | "GALF" | "ZIWS" | "CORP" | "SFFO")
+	}
+}
+
+
+#[cfg(feature = "fuzz")]
+impl<'a> Arbitrary<'a> for Tagg {
+	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
+		use Tagg::*;
+
+		let variant: usize = input.int_in_range(1..=6)?;
+
+		let result = match variant {
+			1 => {
+				Avgc { rgba: input.arbitrary()? }
+			},
+
+			2 => {
+				Maxc { rgba: input.arbitrary()? }
+			},
+
+			3 => {
+				Flag { transparency: input.arbitrary()? }
+			},
+
+			4 => {
+				Swiz { swizzle: input.arbitrary()? }
+			},
+
+			5 => {
+				Proc { code: input.arbitrary()? }
+			},
+
+			6 => {
+				let offs_len: usize = input.int_in_range(0..=16)?;
+				let mut offsets: Vec<u32> = vec![0u32; offs_len];
+
+				for o in offsets.iter_mut() {
+					*o = input.arbitrary()?;
+				};
+
+				if let Some(idx) = offsets.iter().position(|x| *x == 0) {
+					offsets.truncate(idx);
+				};
+
+				Offs { offsets }
+			},
+
+			_ => unreachable!(),
+		};
+
+		Ok(result)
 	}
 }
 
@@ -919,8 +972,48 @@ impl PaaMipmap {
 }
 
 
+#[cfg(feature = "fuzz")]
+impl <'a> Arbitrary<'a> for PaaMipmap {
+	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
+		use PaaType::*;
+		use PaaMipmapCompression::*;
+
+		let paatype = <PaaType as Arbitrary>::arbitrary(input)?;
+
+		let compression = match &paatype {
+			Dxt1 | Dxt2 | Dxt3 | Dxt4 | Dxt5 => Lzo,
+			IndexPalette => *input.choose(&[Lzss, RleBlocks])?,
+			_ => <PaaMipmapCompression as Arbitrary>::arbitrary(input)?,
+		};
+
+		let (width, height) = if paatype.is_dxtn() {
+			// Real-life PAA-DXT dimension limit is 2^14 (16384), we limit it
+			// to 2^10 to avoid slow-unit fuzz artifacts.
+			let width: u16 = 2u16.pow(input.int_in_range(2..=10)?);
+			let height: u16 = 2u16.pow(input.int_in_range(2..=10)?);
+
+			(width, height)
+		}
+		else {
+			// Real-life PAA (non-DXT) dimension limit is 0xFFFF^0x8000 (32767).
+			let width: u16 = input.int_in_range(1..=2000)?;
+			let height: u16 = input.int_in_range(1..=2000)?;
+
+			(width, height)
+		};
+
+		let data_len = paatype.predict_size(width, height);
+		let mut data: Vec<u8> = vec![0u8; data_len];
+		input.fill_buffer(&mut data)?;
+
+		Ok(Self { width, height, paatype, compression, data })
+	}
+}
+
+
 /// The color data used in AVGCTAGG and MAXCTAGG; its byte layout is B:G:R:A.
 #[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 pub struct Bgra8888Pixel {
 	b: u8,
 	g: u8,
@@ -938,6 +1031,7 @@ impl std::fmt::Display for Bgra8888Pixel {
 
 
 #[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[deku(type = "u8")]
 pub enum Transparency {
 	#[display(fmt = "<no transparency>")]
@@ -960,6 +1054,7 @@ impl Default for Transparency {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
 pub struct ArgbSwizzle {
 	#[deku(ctx = "ChannelSwizzleId::Alpha")]
@@ -995,6 +1090,7 @@ impl ArgbSwizzle {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[deku(ctx = "tgt: ChannelSwizzleId")]
 #[display(fmt = "<{}={}>", target, data)]
 pub struct ChannelSwizzle {
@@ -1037,6 +1133,7 @@ impl ChannelSwizzle {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[deku(type = "u8", bits = "2")]
 pub enum ChannelSwizzleId {
 	#[display(fmt = "a")]
@@ -1104,8 +1201,48 @@ impl std::fmt::Display for ChannelSwizzleData {
 }
 
 
+#[cfg(feature = "fuzz")]
+impl<'a> Arbitrary<'a> for ChannelSwizzleData {
+	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
+		let variant: usize = input.int_in_range(1..=2)?;
+
+		let result = match variant {
+			1 => {
+				let neg_flag: bool = input.arbitrary()?;
+				let source: ChannelSwizzleId = input.arbitrary()?;
+				ChannelSwizzleData::Source { neg_flag, source }
+			},
+
+			2 => {
+				let value = input.int_in_range(0..=1)?;
+				ChannelSwizzleData::Fill { value }
+			},
+
+			_ => unreachable!(),
+		};
+
+		Ok(result)
+	}
+}
+
+
+#[derive(Debug, Display, Clone, PartialEq)]
+pub struct TextureMacro {
+	pub text: BString,
+}
+
+
+#[cfg(feature = "fuzz")]
+impl<'a> Arbitrary<'a> for TextureMacro {
+	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
+		Ok(TextureMacro { text: BString::from(<Vec<u8> as Arbitrary>::arbitrary(input)?) })
+	}
+}
+
+
 /// The algorithm compressing the data of a given mipmap.
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 pub enum PaaMipmapCompression {
 	Uncompressed,
 

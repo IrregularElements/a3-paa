@@ -6,6 +6,7 @@ version = 3
 name = "a3-paa"
 version = "0.0.1-dev"
 dependencies = [
+ "arbitrary",
  "bohemia-compression",
  "bstr",
  "byteorder",
