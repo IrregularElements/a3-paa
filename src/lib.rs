@@ -108,10 +108,13 @@ pub enum PaaError {
 	#[display(fmt = "Uncompressed mipmap data is not the same size as computed from dimensions (predict_size({}x{}) = {})", _0, _1, _2)]
 	UnexpectedMipmapDataSize(u16, u16, usize),
 
-	/// The [`PaaImage`] passed to [`PaaImage::as_bytes`] contained a
-	/// [fallible][PaaMipmapContainer::Fallible] container variant.
-	#[display(fmt = "The PaaImage passed to PaaImage::as_bytes contained a fallible container variant")]
-	FallibleMipmapInput,
+	/// The [`PaaImage`] passed to [`PaaImage::as_bytes`] contained mipmap errors.
+	#[display(fmt = "The PaaImage passed to PaaImage::as_bytes contained mipmap errors")]
+	InputMipmapErrorWhileEncoding(usize, Box<PaaError>),
+
+	/// [`PaaMipmap::as_bytes`] failed.
+	#[display(fmt = "PaaMipmap::as_bytes failed")]
+	MipmapErrorWhileSerializing(Box<PaaError>),
 
 	/// A checked arithmetic operation triggered an unexpected under/overflow.
 	#[display(fmt = "A checked arithmetic operation triggered an unexpected under/overflow")]
@@ -179,75 +182,13 @@ macro_rules! debug_trace {
 }
 
 
-/// Wrapper around [`PaaImage::mipmaps`]; methods that read a [`PaaImage`] return
-/// `Fallible`; methods that write a `PaaImage` only accept `Infallible`.
-///
-/// The exact way to convert between the two variants is up to the user;
-/// the most obvious idiom is to [collect][PaaMipmapContainer::into_infallible]
-/// the inner vector of [`Fallible`][PaaMipmapContainer::Fallible] as
-/// [`PaaResult<Vec<PaaMipmap>>`].
-#[derive(Debug, Clone)]
-pub enum PaaMipmapContainer {
-	Fallible(Vec<PaaResult<PaaMipmap>>),
-	Infallible(Vec<PaaMipmap>),
-}
-
-
-impl Default for PaaMipmapContainer {
-	fn default() -> Self {
-		Self::Infallible(vec![])
-	}
-}
-
-
-impl PaaMipmapContainer {
-	/// Returns `Ok(inner)` for [`Infallible`][PaaMipmapContainer::Infallible]
-	/// and [collects][std::iter::Iterator::collect] inner into
-	/// `PaaResult<Vec<PaaMipmap>>` for [Fallible][PaaMipmapContainer::Fallible].
-	pub fn into_infallible(self) -> PaaResult<Vec<PaaMipmap>> {
-		match self {
-			Self::Infallible(v) => PaaResult::Ok(v),
-			Self::Fallible(v) => v
-				.into_iter()
-				.take_while(|m| !matches!(m, Err(EmptyMipmap)))
-				.collect(),
-		}
-	}
-
-	/// Returns all `Ok`'s for [`Infallible`][PaaMipmapContainer::Infallible]
-	/// and the inner value for [`Fallible`][PaaMipmapContainer::Fallible].
-	pub fn into_fallible(self) -> Vec<PaaResult<PaaMipmap>> {
-		match self {
-			Self::Infallible(v) => v.into_iter().map(PaaResult::Ok).collect(),
-			Self::Fallible(v) => v,
-		}
-	}
-
-
-	/// Returns the length of the inner `Vec`.  If `self` is `Fallible`, this
-	/// includes all errors.
-	pub fn len(&self) -> usize {
-		match self {
-			Self::Infallible(v) => v.len(),
-			Self::Fallible(v) => v.len(),
-		}
-	}
-
-
-	/// Returns true if the inner vector is empty.
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
-}
-
-
 #[derive(Default, Debug, Clone)]
 pub struct PaaImage {
 	pub paatype: PaaType,
 	pub taggs:   Vec<Tagg>,
 	pub offsets: Vec<u32>,
 	pub palette: Option<PaaPalette>,
-	pub mipmaps: PaaMipmapContainer,
+	pub mipmaps: Vec<PaaResult<PaaMipmap>>,
 }
 
 
@@ -335,7 +276,7 @@ impl PaaImage {
 				.collect::<Vec<PaaResult<PaaMipmap>>>()
 		};
 
-		let image = PaaImage { paatype, taggs, offsets: offs, palette, mipmaps: PaaMipmapContainer::Fallible(mipmaps) };
+		let image = PaaImage { paatype, taggs, offsets: offs, palette, mipmaps };
 
 		Ok(image)
 	}
@@ -352,8 +293,7 @@ impl PaaImage {
 	/// Convert self to PAA data as `Vec<u8>`.
 	///
 	/// Ignores input Taggs::Offs and regenerates offsets based on actual mipmap
-	/// data.  Will fail if [`self.mipmaps`] is
-	/// [`Fallible`][PaaMipmapContainer::Fallible].
+	/// data.
 	pub fn as_bytes(&self) -> PaaResult<Vec<u8>> {
 		let mut buf: Vec<u8> = Vec::with_capacity(10_000_000);
 
@@ -376,18 +316,15 @@ impl PaaImage {
 			vec![0u8, 0]
 		};
 
-		let mipmaps = if let PaaMipmapContainer::Infallible(mipmaps) = &self.mipmaps {
-			Ok(mipmaps)
-		}
-		else {
-			Err(FallibleMipmapInput)
-		}?;
-
 		let mipmaps_offset = buf.len() as u32 + offs_length + palette_data.len() as u32;
 
-		let mipmap_blocks = mipmaps
+		let mipmap_blocks = self.mipmaps
 			.iter()
-			.map(|m| m.as_bytes())
+			.enumerate()
+			.map(|(i, m)| {
+				let m = m.clone().map_err(|e| InputMipmapErrorWhileEncoding(i, Box::new(e)))?;
+				m.as_bytes().map_err(|e| MipmapErrorWhileSerializing(Box::new(e)))
+			})
 			.collect::<PaaResult<Vec<Vec<u8>>>>()?;
 
 		let mipmap_block_offsets: Vec<u32> = mipmap_blocks
@@ -413,19 +350,6 @@ impl PaaImage {
 		buf.extend([0u8; 6]);
 
 		Ok(buf)
-	}
-
-
-	/// Return an [infallible][PaaMipmapContainer::Infallible] version of
-	/// [`Self`] by [collecting][PaaMipmapContainer::into_infallible] the inner
-	/// mipmap container.
-	pub fn into_infallible(self) -> PaaResult<Self> {
-		let img = Self {
-			mipmaps: PaaMipmapContainer::Infallible(self.mipmaps.into_infallible()?),
-			..self
-		};
-
-		Ok(img)
 	}
 }
 
@@ -1282,19 +1206,11 @@ impl PaaDecoder {
 
 
 	pub fn decode_nth(&self, index: usize) -> PaaResult<RgbaImage> {
-		let mipmap = match &self.paa.mipmaps {
-			PaaMipmapContainer::Fallible(v) => {
-				v.get(index)
-					.ok_or(MipmapIndexOutOfRange)?
-					.as_ref()
-					.map_err(|e| e.clone())?
-			},
-
-			PaaMipmapContainer::Infallible(v) => {
-				v.get(index)
-					.ok_or(MipmapIndexOutOfRange)?
-			},
-		};
+		let mipmap = self.paa.mipmaps
+			.get(index)
+			.ok_or(MipmapIndexOutOfRange)?
+			.as_ref()
+			.map_err(|e| e.clone())?;
 
 		decode_mipmap(mipmap)
 	}

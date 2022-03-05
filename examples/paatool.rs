@@ -99,7 +99,7 @@ fn command_info(matches: &clap::ArgMatches) -> Result<()> {
 		println!("{}Tagg #{}: {}", brief_prefix, pos+1, tagg);
 	};
 
-	let mipmaps = image.mipmaps.clone().into_fallible();
+	let mipmaps = image.mipmaps.clone();
 
 	for (pos, m) in mipmaps.iter().enumerate() {
 		let pos = pos + 1;
@@ -121,7 +121,6 @@ fn command_info(matches: &clap::ArgMatches) -> Result<()> {
 	if matches.is_present("serialize_back") {
 		log::trace!("Attempting to serialize PaaImage back");
 
-		let image = image.into_infallible().context("Could not serialize image back to bytes, errors present in mipmap data")?;
 		let data = image.as_bytes().context("Could not serialize image to bytes")?;
 	};
 
