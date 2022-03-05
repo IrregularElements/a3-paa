@@ -499,6 +499,7 @@ impl Tagg {
 			Self::Flag { transparency } => {
 				extend_with_uint::<LittleEndian,Vec<u8>, _, 4>(&mut bytes, U32_SIZE);
 				bytes.extend(transparency.to_bytes().unwrap());
+				bytes.extend([0x00u8, 0, 0]);
 			},
 
 			Self::Swiz { swizzle } => {
@@ -583,7 +584,7 @@ impl Tagg {
 					return Err(UnexpectedTaggDataSize);
 				}
 
-				let (_, transparency) = Transparency::from_bytes((data, 0))
+				let (_, transparency) = Transparency::from_bytes((&data[0..1], 0))
 					.map_err(|_| UnknownTransparencyValue(data[0]))?;
 
 				Ok(Self::Flag { transparency })
@@ -1032,7 +1033,7 @@ impl std::fmt::Display for Bgra8888Pixel {
 
 #[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
-#[deku(type = "u32", endian = "little")]
+#[deku(type = "u8")]
 pub enum Transparency {
 	#[display(fmt = "<no transparency>")]
 	#[deku(id = "0x00")]
