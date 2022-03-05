@@ -1032,7 +1032,7 @@ impl std::fmt::Display for Bgra8888Pixel {
 
 #[derive(Debug, Display, Clone, PartialEq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
-#[deku(type = "u8")]
+#[deku(type = "u32", endian = "little")]
 pub enum Transparency {
 	#[display(fmt = "<no transparency>")]
 	#[deku(id = "0x00")]
@@ -1054,7 +1054,6 @@ impl Default for Transparency {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
 pub struct ArgbSwizzle {
 	#[deku(ctx = "ChannelSwizzleId::Alpha")]
@@ -1089,6 +1088,18 @@ impl ArgbSwizzle {
 }
 
 
+#[cfg(feature = "arbitrary")]
+impl<'a> Arbitrary<'a> for ArgbSwizzle {
+	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
+		let a: ChannelSwizzle = ChannelSwizzle { target: ChannelSwizzleId::Alpha, ..input.arbitrary()? };
+		let r: ChannelSwizzle = ChannelSwizzle { target: ChannelSwizzleId::Red, ..input.arbitrary()? };
+		let g: ChannelSwizzle = ChannelSwizzle { target: ChannelSwizzleId::Green, ..input.arbitrary()? };
+		let b: ChannelSwizzle = ChannelSwizzle { target: ChannelSwizzleId::Blue, ..input.arbitrary()? };
+		Ok(ArgbSwizzle { a, r, g, b})
+	}
+}
+
+
 #[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[deku(ctx = "tgt: ChannelSwizzleId")]
@@ -1119,11 +1130,7 @@ impl ChannelSwizzle {
 			},
 
 			Fill { value } => {
-				let fill_byte: u8 = match value {
-					0 => 0x00,
-					1 => 0xFF,
-					_ => unreachable!(),
-				};
+				let fill_byte: u8 = value as u8;
 
 				Box::new(move |_: &[u8; 4], dst: &mut [u8; 4]| { dst[target_idx] = fill_byte })
 			},
@@ -1177,8 +1184,8 @@ pub enum ChannelSwizzleData {
 
 	#[deku(id = "0b1")]
 	Fill {
-		#[deku(pad_bits_before = "2", bits = "1", map = "|field: u8| -> Result<_, DekuError> { Ok(1-field) }")]
-		value: u8
+		#[deku(pad_bits_before = "1")]
+		value: ChannelSwizzleFill
 	},
 }
 
@@ -1214,7 +1221,7 @@ impl<'a> Arbitrary<'a> for ChannelSwizzleData {
 			},
 
 			2 => {
-				let value = input.int_in_range(0..=1)?;
+				let value: ChannelSwizzleFill = input.arbitrary()?;
 				ChannelSwizzleData::Fill { value }
 			},
 
@@ -1223,6 +1230,20 @@ impl<'a> Arbitrary<'a> for ChannelSwizzleData {
 
 		Ok(result)
 	}
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[deku(type = "u8", bits = "2")]
+#[repr(u8)]
+pub enum ChannelSwizzleFill {
+	#[display(fmt = "1")]
+	#[deku(id = "0b00")]
+	FillFF = 0xFF,
+	#[display(fmt = "0")]
+	#[deku(id = "0b01")]
+	Fill00 = 0x00,
 }
 
 
