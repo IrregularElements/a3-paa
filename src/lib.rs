@@ -89,6 +89,10 @@ pub enum PaaError {
 	#[display(fmt = "Attempted to read a FLAGTAGG with unknown transparency value: {:02x?}", _0)]
 	UnknownTransparencyValue(#[error(ignore)] u8),
 
+	/// Attempted to read a [`Tagg::Swiz`] with unexpected swizzle value.
+	#[display(fmt = "Attempted to read a SWIZTAGG with unknown swizzle values: {:02x?}", _0)]
+	UnknownSwizzleValues(#[error(ignore)] [u8; 4]),
+
 	/// [`PaaPalette::as_bytes`] received a palette with number of colors
 	/// overflowing a [`u16`][std::primitive::u16].
 	#[display(fmt = "Received a palette with number of colors overflowing a u16 while encoding")]
@@ -594,7 +598,8 @@ impl Tagg {
 				if data.len() != 4 {
 					return Err(UnexpectedTaggDataSize);
 				}
-				let (_, swizzle) = ArgbSwizzle::from_bytes((data, 0)).unwrap();
+				let (_, swizzle) = ArgbSwizzle::from_bytes((data, 0))
+					.map_err(|_| UnknownSwizzleValues(data[0..4].try_into().unwrap()))?;
 				Ok(Self::Swiz { swizzle })
 			},
 
