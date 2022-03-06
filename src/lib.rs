@@ -984,32 +984,46 @@ impl <'a> Arbitrary<'a> for PaaMipmap {
 		use PaaType::*;
 		use PaaMipmapCompression::*;
 
-		let paatype = <PaaType as Arbitrary>::arbitrary(input)?;
+		let variant: usize = input.int_in_range(1..=4)?;
 
-		let compression = match &paatype {
-			Dxt1 | Dxt2 | Dxt3 | Dxt4 | Dxt5 => Lzo,
-			IndexPalette => *input.choose(&[Lzss, RleBlocks])?,
-			_ => <PaaMipmapCompression as Arbitrary>::arbitrary(input)?,
-		};
+		let (paatype, compression, width, height) = match variant {
+			1 => {
+				// PaaType = DXTn, conditional LZO compression
+				let paatype = *input.choose(&[Dxt1, Dxt2, Dxt3, Dxt4, Dxt5])?;
+				let width: u16 = 2u16.pow(input.int_in_range(2..=10)?);
+				let height: u16 = 2u16.pow(input.int_in_range(2..=10)?);
 
-		let (width, height) = if paatype.is_dxtn() {
-			// Real-life PAA-DXT dimension limit is 2^14 (16384), we limit it
-			// to 2^10 to avoid slow-unit fuzz artifacts.
-			let width: u16 = 2u16.pow(input.int_in_range(2..=10)?);
-			let height: u16 = 2u16.pow(input.int_in_range(2..=10)?);
+				let compression = if width as u32 * height as u32 > 256*256 {
+					Lzo
+				}
+				else {
+					Uncompressed
+				};
 
-			(width, height)
-		}
-		else {
-			// Real-life PAA (non-DXT) dimension limit is 0xFFFF^0x8000 (32767).
-			let width: u16 = input.int_in_range(1..=2000)?;
-			let height: u16 = input.int_in_range(1..=2000)?;
+				(paatype, compression, width, height)
+			},
 
-			(width, height)
+			variant @ (2 | 3) => {
+				// PaaType = IndexPalette, LZSS or RLE compression
+				let compression = if variant == 2 { Lzss } else { RleBlocks };
+				let width: u16 = input.int_in_range(1..=2000)?;
+				let height: u16 = input.int_in_range(1..=2000)?;
+				(IndexPalette, compression, width, height)
+			},
+
+			4 => {
+				// PaaType = other, LZSS compression
+				let paatype = *input.choose(&[Argb1555, Argb4444, Argb8888, Ai88])?;
+				let width: u16 = input.int_in_range(1..=2000)?;
+				let height: u16 = input.int_in_range(1..=2000)?;
+				(paatype, Lzss, width, height)
+			},
+
+			_ => unreachable!(),
 		};
 
 		let data_len = paatype.predict_size(width, height);
-		let mut data: Vec<u8> = vec![0u8; data_len];
+		let mut data = vec![0u8; data_len];
 		input.fill_buffer(&mut data)?;
 
 		Ok(Self { width, height, paatype, compression, data })
