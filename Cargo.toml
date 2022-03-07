@@ -16,7 +16,6 @@ derive_more = "0.99.17"
 arbitrary = { version = "1.1.0", features = ["derive"], optional = true }
 deku = "0.13.0"
 byteorder = "1.4.3"
-libc = "0.2.119"
 bstr = "0.2.17"
 segvec = "0.1.5"
 minilzo-rs = "0.6.0"
@@ -25,7 +24,7 @@ squish = "2.0.0-beta1"
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
-rev = "18cfdedfa530ea4d5468154a1c2210445bd751e2"
+rev = "23afce3e4e3a55eb448380e9a60a35bf1a1afd1b"
 
 [dev-dependencies]
 anyhow = { version = "1.0.55", features = ["backtrace"] }
