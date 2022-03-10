@@ -22,7 +22,7 @@ fn construct_app() -> clap::Command<'static> {
 			.about("Parse a PAA file and log details")
 			.arg(clap::arg!(brief: -b --brief "Do not prepend file name to output").takes_value(false))
 			.arg(clap::arg!(serialize_back: -S "Serialize PAA back in memory for debugging").takes_value(false))
-			.arg(clap::arg!(input: <INPUT> "PAA file to parse")))
+			.arg(clap::arg!(input: <INPUT> ... "PAA file to parse")))
 }
 
 
@@ -78,19 +78,55 @@ fn main() -> Result<()> {
 
 
 fn command_info(matches: &clap::ArgMatches) -> Result<()> {
-	let input = matches.value_of("input").expect("INPUT required");
 	let brief = matches.is_present("brief");
+	let serialize = matches.is_present("serialize_back");
 
+	let mut result = Ok(());
+
+	for path in matches.values_of("input").expect("INPUT required") {
+		let result_now = paa_path_info(path, brief, serialize);
+
+		if let Err(ref e) = result_now {
+			result = result_now;
+		};
+	};
+
+	result
+}
+
+
+fn command_paa2png(matches: &clap::ArgMatches) -> Result<()> {
+	let paa_path = matches.value_of("paa").expect("PAA required");
+	let png_path = matches.value_of("png").expect("PNG required");
+	let mip_idx_str = matches.value_of("mipmap").unwrap_or("1");
+	let mip_idx = mip_idx_str.parse::<usize>().with_context(|| format!("Failed to parse mipmap index from -m{}", mip_idx_str))?;
+
+	let mut paa_file = std::fs::File::open(paa_path).with_context(|| format!("Could not open file: {}", paa_path))?;
+	let image = PaaImage::read_from(&mut paa_file).with_context(|| format!("Could not read PaaImage: {}", paa_path))?;
+	let mip_count = image.mipmaps.len();
+
+	let decoder = PaaDecoder::from_paa(image);
+
+	let decoded_image = decoder.decode_nth(mip_idx-1)
+		.with_context(|| format!("Failed to decode mipmap #{} (should be in [1..{}])", mip_idx, mip_count))?;
+	decoded_image.save_with_format(png_path, image::ImageFormat::Png)
+		.with_context(|| format!("save_with_format to path failed: {}", png_path))?;
+
+	Ok(())
+}
+
+
+fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> Result<()> {
 	let brief_prefix = if brief {
 		"".to_string()
 	}
 	else {
-		format!("{}: ", input)
+		format!("{}: ", path)
 	};
 
-	let mut file = std::fs::File::open(input).with_context(|| format!("Could not open file: {}", input))?;
-	let filesize = file.metadata().with_context(|| format!("Could not read metadata to determine size: {}", input))?.len();
-	let image = PaaImage::read_from(&mut file).with_context(|| format!("Could not read PaaImage: {}", input))?;
+	let mut file = std::fs::File::open(path).with_context(|| format!("Could not open file: {}", path))?;
+	let filesize = file.metadata().with_context(|| format!("Could not read metadata to determine size: {}", path))?.len();
+	let image = PaaImage::read_from(&mut file).with_context(|| format!("Could not read PaaImage: {}", path))?;
 
 	println!("{}File size: {} (0x{:X})", brief_prefix, filesize, filesize);
 	println!("{}PaaType: {:?}", brief_prefix, image.paatype);
@@ -118,32 +154,11 @@ fn command_info(matches: &clap::ArgMatches) -> Result<()> {
 		};
 	};
 
-	if matches.is_present("serialize_back") {
+	if serialize_back {
 		log::trace!("Attempting to serialize PaaImage back");
 
 		let data = image.as_bytes().context("Could not serialize image to bytes")?;
 	};
-
-	Ok(())
-}
-
-
-fn command_paa2png(matches: &clap::ArgMatches) -> Result<()> {
-	let paa_path = matches.value_of("paa").expect("PAA required");
-	let png_path = matches.value_of("png").expect("PNG required");
-	let mip_idx_str = matches.value_of("mipmap").unwrap_or("1");
-	let mip_idx = mip_idx_str.parse::<usize>().with_context(|| format!("Failed to parse mipmap index from -m{}", mip_idx_str))?;
-
-	let mut paa_file = std::fs::File::open(paa_path).with_context(|| format!("Could not open file: {}", paa_path))?;
-	let image = PaaImage::read_from(&mut paa_file).with_context(|| format!("Could not read PaaImage: {}", paa_path))?;
-	let mip_count = image.mipmaps.len();
-
-	let decoder = PaaDecoder::from_paa(image);
-
-	let decoded_image = decoder.decode_nth(mip_idx-1)
-		.with_context(|| format!("Failed to decode mipmap #{} (should be in [1..{}])", mip_idx, mip_count))?;
-	decoded_image.save_with_format(png_path, image::ImageFormat::Png)
-		.with_context(|| format!("save_with_format to path failed: {}", png_path))?;
 
 	Ok(())
 }
