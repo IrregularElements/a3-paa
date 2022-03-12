@@ -10,6 +10,6 @@ fuzz_target!(|data: &[u8]| {
 	let image = PaaImage::read_from(&mut cursor);
 
 	if let Ok(image) = image {
-		let _ = image.as_bytes();
+		let _ = image.to_bytes();
 	};
 });

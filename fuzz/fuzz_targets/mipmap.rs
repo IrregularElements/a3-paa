@@ -7,7 +7,7 @@ use a3_paa::PaaMipmap;
 
 fuzz_target!(|mip: PaaMipmap| {
 	let paatype = mip.paatype;
-	let bytes = mip.as_bytes().unwrap();
+	let bytes = mip.to_bytes().unwrap();
 	let mipp = PaaMipmap::from_bytes(&bytes, paatype).unwrap();
 	assert_eq!(mip.width, mipp.width);
 	assert_eq!(mip.height, mipp.height);

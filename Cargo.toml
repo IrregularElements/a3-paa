@@ -10,17 +10,24 @@ default = []
 fuzz = ["arbitrary"]
 
 [dependencies]
-log = "0.4.14"
-static_assertions = "1.1.0"
-derive_more = "0.99.17"
-arbitrary = { version = "1.1.0", features = ["derive"], optional = true }
-deku = "0.13.0"
-byteorder = "1.4.3"
-bstr = "0.2.17"
-segvec = "0.1.5"
-minilzo-rs = "0.6.0"
-image = "0.24.1"
-squish = "2.0.0-beta1"
+arbitrary = { version = "1.1.0", features = ["derive"], optional = true } # impl Arbitrary for fuzzing
+bstr = "0.2.17" # [TODO] PROCTAGG text
+byteorder = "1.4.3" # Read little-endian PAA data
+deku = "0.13.0" # derive(DekuRead, DekuWrite) for PAA structures
+derive_more = "0.99.17" # derive(Display, Error)
+enum-utils = "0.1.2" # derive(FromStr)
+image = "0.24.1" # Read and write common image formats
+log = { version = "0.4.16", optional = true }
+minilzo-rs = "0.6.0" # Read and write LZO-compressed DXTn textures
+nom = "7.1.1" # Parse TexConvert.cfg
+squish = "2.0.0-beta1" # Read and write DXTn textures
+static_assertions = "1.1.0" # [TODO]
+tap = "1.0.1" # Convenience extension methods on monadic types
+unicode-xid = "0.2.2" # [TODO] Parse identifiers in TexConvert.cfg
+
+[dependencies.surety]
+git = "https://github.com/myrrlyn/surety.git"
+rev = "bab3b93109417a5da76eccf0378a42dbeb79e9d2"
 
 [dependencies.bohemia-compression]
 git = "https://github.com/IrregularElements/bohemia-compression.git"
@@ -28,9 +35,11 @@ rev = "23afce3e4e3a55eb448380e9a60a35bf1a1afd1b"
 
 [dev-dependencies]
 anyhow = { version = "1.0.55", features = ["backtrace"] }
-fern = "0.6.0"
 chrono = "0.4.19"
 clap = { version = "3.1.5", features = ["cargo"] }
+fern = "0.6.0"
+log = "0.4.16"
+wild = "2.0.4"
 
 [[example]]
 name = "paatool"
