@@ -1035,10 +1035,10 @@ impl <'a> Arbitrary<'a> for PaaMipmap {
 #[derive(Debug, Clone, Copy, PartialEq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 pub struct Bgra8888Pixel {
-	b: u8,
-	g: u8,
-	r: u8,
-	a: u8,
+	pub b: u8,
+	pub g: u8,
+	pub r: u8,
+	pub a: u8,
 }
 
 
@@ -1077,13 +1077,13 @@ impl Default for Transparency {
 #[display(fmt = "{}, {}, {}, {}", a, r, g, b)]
 pub struct ArgbSwizzle {
 	#[deku(ctx = "ChannelSwizzleId::Alpha")]
-	a: ChannelSwizzle,
+	pub a: ChannelSwizzle,
 	#[deku(ctx = "ChannelSwizzleId::Red")]
-	r: ChannelSwizzle,
+	pub r: ChannelSwizzle,
 	#[deku(ctx = "ChannelSwizzleId::Green")]
-	g: ChannelSwizzle,
+	pub g: ChannelSwizzle,
 	#[deku(ctx = "ChannelSwizzleId::Blue")]
-	b: ChannelSwizzle,
+	pub b: ChannelSwizzle,
 }
 
 
@@ -1179,7 +1179,7 @@ pub enum ChannelSwizzleId {
 
 
 impl ChannelSwizzleId {
-	fn as_rgba_index(&self) -> usize {
+	pub fn as_rgba_index(&self) -> usize {
 		use ChannelSwizzleId::*;
 
 		match self {
@@ -1296,7 +1296,7 @@ pub enum PaaMipmapCompression {
 
 
 pub struct PaaDecoder {
-	paa: PaaImage,
+	pub paa: PaaImage,
 }
 
 
