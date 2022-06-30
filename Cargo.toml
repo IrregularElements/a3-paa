@@ -17,7 +17,6 @@ deku = "0.15.0" # derive(DekuRead, DekuWrite) for PAA structures
 derive_more = "0.99.17" # derive(Display, Error)
 enum-utils = "0.1.2" # derive(FromStr)
 image = "0.24.1" # Read and write common image formats
-log = { version = "0.4.16", optional = true }
 minilzo-rs = "0.6.0" # Read and write LZO-compressed DXTn textures
 nom = "7.1.1" # Parse TexConvert.cfg
 static_assertions = "1.1.0" # [TODO]
@@ -35,10 +34,9 @@ rev = "23afce3e4e3a55eb448380e9a60a35bf1a1afd1b"
 
 [dev-dependencies]
 anyhow = { version = "1.0.55", features = ["backtrace"] }
-chrono = "0.4.19"
 clap = { version = "3.1.5", features = ["cargo"] }
-fern = "0.6.0"
-log = "0.4.16"
+tracing = "0.1.35"
+tracing-subscriber = "0.3.11"
 wild = "2.0.4"
 
 [[example]]

@@ -16,13 +16,13 @@ pub fn command_encode(matches: &clap::ArgMatches) -> anyhow::Result<()> {
 	else {
 		suggest_hints_paths()
 			.find_map(|p| std::fs::read_to_string(&p).ok())
-			.tap_some(|p| log::trace!("Located TexConvert.cfg at path: {:?}", p))
+			.tap_some(|p| tracing::trace!("Located TexConvert.cfg at path: {:?}", p))
 			.context("No TexConvert.cfg file provided, and could not locate any")?
 	};
 
 	let hints = TextureHints
 		::try_parse_from_str(&hints_str)
-		.tap_ok(|h| log::trace!("Parsed TexConvert.cfg; got {} hints", h.len()))
+		.tap_ok(|h| tracing::trace!("Parsed TexConvert.cfg; got {} hints", h.len()))
 		.context("Failed to parse TexConvert.cfg")?;
 
 	let paa_path_suffix = TextureHints
@@ -42,11 +42,10 @@ pub fn command_encode(matches: &clap::ArgMatches) -> anyhow::Result<()> {
 	let settings = hints
 		.get(&suffix)
 		.context(format!("Texture type not found in config: {:?}", suffix))?;
-	log::info!("Texture settings for {:?}: {}", paa_path, settings);
+	tracing::info!("Texture settings for {:?}: {}", paa_path, settings);
 
-	let warn_unimplemented = |path, prop| log::error!("{}: Attempting to encode \
-		a texture that has `{}` set, this is currently not implemented; \
-		continuing, but results will be wrong", path, prop);
+	let warn_unimplemented = |path, prop| tracing::error!("{}: Texture has `{}` \
+		set, which is currently not implemented; ignoring it and continuing", path, prop);
 
 	if settings.dynrange.is_some() {
 		warn_unimplemented(paa_path, "dynRange");

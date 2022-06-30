@@ -59,7 +59,7 @@ fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> Result<()> {
 	};
 
 	if serialize_back {
-		log::trace!("Attempting to serialize PaaImage back");
+		tracing::trace!("Attempting to serialize PaaImage back");
 
 		let data = image.to_bytes().context("Could not serialize image to bytes")?;
 	};

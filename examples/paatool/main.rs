@@ -42,24 +42,14 @@ fn paatool() -> Result<()> {
 	let loglevel_str = matches.value_of("loglevel")
 		.unwrap_or("Info");
 	let loglevel = loglevel_str
-		.parse::<log::LevelFilter>()
+		.parse::<tracing::Level>()
 		.with_context(|| format!("Failed to parse loglevel from -L{}", loglevel_str))?;
 
-	fern::Dispatch::new()
-		.format(|out, message, record| {
-			out.finish(format_args!(
-				"[{}] [{}] {}",
-				record.target(),
-				record.level(),
-				message
-			))
-		})
-		.level(loglevel)
-		.chain(std::io::stderr())
-		.apply()
-		.unwrap();
+	tracing_subscriber::fmt()
+		.with_max_level(loglevel)
+		.init();
 
-	log::trace!("Global loglevel set to {:?}", loglevel);
+	tracing::trace!("Global loglevel set to {:?}", loglevel);
 
 	match matches.subcommand() {
 		Some(("encode", matches)) => {
@@ -87,6 +77,6 @@ fn paatool() -> Result<()> {
 fn main() -> Result<()> {
 	match paatool() {
 		Ok(()) => Ok(()),
-		Err(e) => { log::error!("{:?}", e); Ok(()) },
+		Err(e) => { tracing::error!("{:?}", e); Ok(()) },
 	}
 }
