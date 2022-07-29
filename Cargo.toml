@@ -20,9 +20,9 @@ image = "0.24.1" # Read and write common image formats
 log = { version = "0.4.16", optional = true }
 minilzo-rs = "0.6.0" # Read and write LZO-compressed DXTn textures
 nom = "7.1.1" # Parse TexConvert.cfg
-squish = "2.0.0-beta1" # Read and write DXTn textures
 static_assertions = "1.1.0" # [TODO]
 tap = "1.0.1" # Convenience extension methods on monadic types
+texpresso = "2.0.1" # Read and write DXTn textures
 unicode-xid = "0.2.2" # [TODO] Parse identifiers in TexConvert.cfg
 
 [dependencies.surety]

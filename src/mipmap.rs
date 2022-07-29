@@ -6,7 +6,7 @@ use std::default::Default;
 #[cfg(feature = "fuzz")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use image::RgbaImage;
-use squish::Format as SquishFormat;
+use texpresso::Format as TextureFormat;
 use static_assertions::const_assert;
 use surety::Ensure;
 use bohemia_compression::*;
@@ -314,11 +314,11 @@ impl PaaMipmap {
 			paatype @ (Dxt1 | Dxt2 | Dxt3 | Dxt4 | Dxt5) => {
 				#[allow(clippy::match_same_arms)]
 				let (comp_ratio, format) = match &paatype {
-					Dxt1 => (8, SquishFormat::Bc1),
-					Dxt2 => (4, SquishFormat::Bc2),
-					Dxt3 => (4, SquishFormat::Bc2),
-					Dxt4 => (4, SquishFormat::Bc3),
-					Dxt5 => (4, SquishFormat::Bc3),
+					Dxt1 => (8, TextureFormat::Bc1),
+					Dxt2 => (4, TextureFormat::Bc2),
+					Dxt3 => (4, TextureFormat::Bc2),
+					Dxt4 => (4, TextureFormat::Bc3),
+					Dxt5 => (4, TextureFormat::Bc3),
 					_ => unreachable!(),
 				};
 
@@ -358,10 +358,10 @@ impl PaaMipmap {
 
 		match paatype {
 			//t if t.is_dxtn() => {
-				////let squishformat = match t {
-					////Dxt1 => SquishFormat::Bc1,
-					////Dxt2 | Dxt3 => SquishFormat::Bc2,
-					////Dxt4 | Dxt5 => SquishFormat::Bc3,
+				////let textureformat = match t {
+					////Dxt1 => TextureFormat::Bc1,
+					////Dxt2 | Dxt3 => TextureFormat::Bc2,
+					////Dxt4 | Dxt5 => TextureFormat::Bc3,
 				////};
 				//todo!()
 			//},
