@@ -16,10 +16,10 @@ dependencies = [
  "image",
  "minilzo-rs",
  "nom",
- "squish",
  "static_assertions",
  "surety",
  "tap",
+ "texpresso",
  "unicode-xid",
 ]
 
@@ -863,15 +863,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "squish"
-version = "2.0.0-beta1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4e07ffb43857ea50d8f5646c779a5a75a9f322e5625fd2b8b14236147198498"
-dependencies = [
- "libm",
-]
-
-[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -907,6 +898,15 @@ name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
+
+[[package]]
+name = "texpresso"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8277e703c934b9693d0773d5749faacc6366b3d81d012da556a4cfd4ab87f336"
+dependencies = [
+ "libm",
+]
 
 [[package]]
 name = "thiserror"
