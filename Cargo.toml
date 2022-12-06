@@ -13,7 +13,7 @@ fuzz = ["arbitrary"]
 arbitrary = { version = "1.1.0", features = ["derive"], optional = true } # impl Arbitrary for fuzzing
 bstr = "0.2.17" # [TODO] PROCTAGG text
 byteorder = "1.4.3" # Read little-endian PAA data
-deku = "0.13.0" # derive(DekuRead, DekuWrite) for PAA structures
+deku = "0.15.0" # derive(DekuRead, DekuWrite) for PAA structures
 derive_more = "0.99.17" # derive(Display, Error)
 enum-utils = "0.1.2" # derive(FromStr)
 image = "0.24.1" # Read and write common image formats
