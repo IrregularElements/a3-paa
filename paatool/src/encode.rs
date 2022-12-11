@@ -11,12 +11,12 @@ pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 
 	let hints_str: String = if let Some(path) = matches.value_of("hints") {
 		std::fs::read_to_string(&path)
-			.context(format!("Failed to read TexConvert.cfg from file {:?}", path))?
+			.context(format!("{path:?}: Failed to read TexConvert.cfg"))?
 	}
 	else {
 		suggest_hints_paths()
 			.find_map(|p| std::fs::read_to_string(&p).ok())
-			.tap_some(|p| tracing::trace!("Located TexConvert.cfg at path: {:?}", p))
+			.tap_some(|p| tracing::trace!("Located TexConvert.cfg at path: {p:?}"))
 			.context("No TexConvert.cfg file provided, and could not locate any")?
 	};
 
@@ -27,7 +27,7 @@ pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 
 	let paa_path_suffix = TextureHints
 		::texture_filename_to_suffix(&paa_path)
-		.context(format!("No suffix in texture path: {:?}", paa_path));
+		.context(format!("{paa_path:?}: No suffix in texture path"));
 
 	let suffix = matches.value_of("suffix")
 		.map(String::from)
@@ -36,16 +36,16 @@ pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 		.context("Texture suffix was not specified and not found in texture path")?;
 
 	let image = image::open(img_path)
-		.context(format!("Failed to open input IMG {:?}", img_path))?
+		.context(format!("{img_path:?}: Failed to open input IMG"))?
 		.into_rgba8();
 
 	let settings = hints
 		.get(&suffix)
-		.context(format!("Texture type not found in config: {:?}", suffix))?;
-	tracing::info!("Texture settings for {:?}: {}", paa_path, settings);
+		.context(format!("{suffix:?}: Texture type not found in config"))?;
+	tracing::info!("Texture settings for {paa_path:?}: {settings}");
 
-	let warn_unimplemented = |path, prop| tracing::error!("{}: Texture has `{}` \
-		set, which is currently not implemented; ignoring it and continuing", path, prop);
+	let warn_unimplemented = |path, prop| tracing::error!("{path}: Texture has `{prop}` \
+		set, which is currently not implemented; ignoring it and continuing");
 
 	if settings.dynrange.is_some() {
 		warn_unimplemented(paa_path, "dynRange");
@@ -67,7 +67,7 @@ pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 		.context("Failed to serialize PAA to bytes")?;
 
 	std::fs::write(paa_path, data)
-		.context(format!("Failed to write PAA data to {:?}", paa_path))?;
+		.context(format!("Failed to write PAA data to {paa_path:?}"))?;
 
 	Ok(())
 }
@@ -94,7 +94,7 @@ fn suggest_hints_paths() -> impl Iterator<Item=PathBuf> {
 
 		for drive in ["C", "D", "E"] {
 			for root_dir in [r"Program Files (x86)\Steam", "Steam"] {
-				let path_string = format!(r"{}:\{}\steamapps\common\Arma 3 Tools\TexView2", drive, root_dir);
+				let path_string = format!(r"{drive}:\{root_dir}\steamapps\common\Arma 3 Tools\TexView2");
 				parent_dirs.push(PathBuf::from(path_string));
 			};
 		};

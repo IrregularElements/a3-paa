@@ -28,15 +28,15 @@ fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> AnyhowResult<
 		format!("{}: ", path)
 	};
 
-	let mut file = std::fs::File::open(path).with_context(|| format!("Could not open file: {}", path))?;
-	let filesize = file.metadata().with_context(|| format!("Could not read metadata to determine size: {}", path))?.len();
-	let image = PaaImage::read_from(&mut file).with_context(|| format!("Could not read PaaImage: {}", path))?;
+	let mut file = std::fs::File::open(path).with_context(|| format!("Could not open file: {path}"))?;
+	let filesize = file.metadata().with_context(|| format!("Could not read metadata to determine size: {path}"))?.len();
+	let image = PaaImage::read_from(&mut file).with_context(|| format!("Could not read PaaImage: {path}"))?;
 
-	println!("{}File size: {} (0x{:X})", brief_prefix, filesize, filesize);
-	println!("{}PaaType: {:?}", brief_prefix, image.paatype);
+	println!("{brief_prefix}File size: {filesize} (0x{filesize:X})");
+	println!("{brief_prefix}PaaType: {:?}", image.paatype);
 
 	for (pos, tagg) in image.taggs.iter().enumerate() {
-		println!("{}Tagg #{}: {}", brief_prefix, pos+1, tagg);
+		println!("{brief_prefix}Tagg #{}: {tagg}", pos+1);
 	};
 
 	let mipmaps = image.mipmaps.clone();
@@ -45,16 +45,14 @@ fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> AnyhowResult<
 		let pos = pos + 1;
 
 		if let Ok(m) = m {
-			println!("{}Mipmap #{}, {}x{} [{:?}], size={}",
-				brief_prefix,
-				pos,
+			println!("{brief_prefix}Mipmap #{pos}, {}x{} [{:?}], size={}",
 				m.width,
 				m.height,
 				m.compression,
 				m.data.len());
 		}
 		else {
-			println!("{}Mipmap #{} ERROR {:?}", brief_prefix, pos, m);
+			println!("{brief_prefix}Mipmap #{pos} ERROR {m:?}");
 		};
 	};
 

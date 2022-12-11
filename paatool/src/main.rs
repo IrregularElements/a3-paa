@@ -1,7 +1,9 @@
 #![allow(unused_variables)]
 
+use std::process::ExitCode;
 
 use anyhow::{Context, Result as AnyhowResult};
+use tap::prelude::*;
 
 mod encode;
 mod decode;
@@ -49,13 +51,13 @@ fn paatool() -> AnyhowResult<()> {
 		.unwrap_or("Info");
 	let loglevel = loglevel_str
 		.parse::<tracing::Level>()
-		.with_context(|| format!("Failed to parse loglevel from -L{}", loglevel_str))?;
+		.with_context(|| format!("Failed to parse loglevel from -L{loglevel_str}"))?;
 
 	tracing_subscriber::fmt()
 		.with_max_level(loglevel)
 		.init();
 
-	tracing::trace!("Global loglevel set to {:?}", loglevel);
+	tracing::trace!("Global loglevel set to {loglevel:?}");
 
 	match matches.subcommand() {
 		Some(("encode", matches)) => {
@@ -84,9 +86,15 @@ fn paatool() -> AnyhowResult<()> {
 }
 
 
-fn main() -> AnyhowResult<()> {
-	match paatool() {
-		Ok(()) => Ok(()),
-		Err(e) => { tracing::error!("{:?}", e); Ok(()) },
-	}
+fn main() -> ExitCode {
+	let report_chain = |e: &anyhow::Error| {
+		for (index, cause) in e.chain().enumerate() {
+			let suffix = if index == 0 { "" } else { "... " };
+			tracing::error!("{suffix}{cause}");
+		};
+	};
+
+	crate::paatool()
+		.tap_err(|e| report_chain(e))
+		.map_or(ExitCode::FAILURE, |_| ExitCode::SUCCESS)
 }

@@ -8,50 +8,46 @@ complemented by the [PMC Editing Wiki].
 ### Examples
 ```rust,no_run
 fn main() -> anyhow::Result<()> {
-  use a3_paa::*;
-  use image::ImageFormat;
-  use anyhow::Context;
+    use std::{fs::File, path::Path};
 
-  // Decoding a PAA image
-  let mut paa_file = std::fs::File::open("sky_clear_sky.paa")?;
-  let image: PaaImage = PaaImage::read_from(&mut paa_file)?;
-  let decoder: PaaDecoder = PaaDecoder::with_paa(image);
-  let image: image::RgbaImage = decoder.decode_first()?;
-  image.save_with_format("sky_clear_sky.png", ImageFormat::Png);
+    use a3_paa::*;
+    use image::{ImageFormat, RgbaImage};
+    use anyhow::Context;
 
-  // Reading TexConvert.cfg (needed for encoding settings)
-  let tc = std::fs::read_to_string("C:\\Program Files (x86)\\Steam\\steamapps\\\
-    common\\Arma 3 Tools\\TexView2\\TexConvert.cfg")
-    .context("Could not read TexConvert.cfg")?;
-  let hints: TextureHints = TextureHints::try_parse_from_str(&tc)?;
+    // Decoding a PAA image
+    let mut paa_file = File::open("sky_clear_sky.paa")?;
+    let image: PaaImage = PaaImage::read_from(&mut paa_file)?;
+    let decoder: PaaDecoder = PaaDecoder::with_paa(image);
+    let image: RgbaImage = decoder.decode_first()?;
+    image.save_with_format("sky_clear_sky.png", ImageFormat::Png);
 
-  // Encoding a PAA image
-  let image_filename = std::path::Path::new("sky_clear_sky.png");
-  let image = image::open(image_filename)?.into_rgba8();
-  let suffix: String = TextureHints
-    ::texture_filename_to_suffix(&image_filename)
-    .context("Suffix not found in texture path")?;
-  assert_eq!(suffix, "SKY");
-  let settings = hints.get(&suffix).context("SKY texture type not found")?;
-  let encoder: PaaEncoder = PaaEncoder::with_image_and_settings(image, settings.clone());
-  let paa: PaaImage = encoder.encode()?;
-  std::fs::write("sky_clear_sky.paa", paa.to_bytes()?)?;
+    // Reading TexConvert.cfg (needed for encoding settings)
+    let tc = std::fs::read_to_string("C:\\Program Files (x86)\\Steam\\steamapps\\\
+      common\\Arma 3 Tools\\TexView2\\TexConvert.cfg")
+      .context("Could not read TexConvert.cfg")?;
+    let hints: TextureHints = TextureHints::try_parse_from_str(&tc)?;
 
-  Ok(())
+    // Encoding a PAA image
+    let image_filename = Path::new("sky_clear_sky.png");
+    let image = image::open(image_filename)?.into_rgba8();
+    let suffix: String = TextureHints
+      ::texture_filename_to_suffix(&image_filename)
+      .context("Suffix not found in texture path")?;
+    assert_eq!(suffix, "SKY");
+    let settings = hints.get(&suffix).context("SKY texture type not found")?;
+    let encoder: PaaEncoder = PaaEncoder::with_image_and_settings(image, settings.clone());
+    let paa: PaaImage = encoder.encode()?;
+    std::fs::write("sky_clear_sky.paa", paa.to_bytes()?)?;
+
+    Ok(())
 }
 ```
 
 ### `paatool`
-To install, run:
+The CLI to `a3-paa`.
 ```sh
 cargo install --force --git=https://github.com/IrregularElements/a3-paa paatool
-```
-
-```sh
 paatool --help
-paatool info sky_clear_sky.paa # Show information about PAA
-paatool decode sky_clear_sky.paa sky_clear_sky.png # Convert PAA to PNG
-paatool encode sky_clear_sky.png sky_clear_sky.paa # Convert image to PAA
 ```
 
 ### Roadmap
@@ -79,10 +75,10 @@ paatool encode sky_clear_sky.png sky_clear_sky.paa # Convert image to PAA
   + [ ] Texture filter language (bitfilt)
   + [ ] Procedural texture generation language (PROCTAGG)
   + [ ] LZSS checksum
-+ [ ] `paatool`:
++ [x] `paatool`:
   + [x] Encode and decode PAAs
   + [x] Show PAA info
-  + [ ] Convert DDS to PAA
+  + [x] Convert DDS to PAA
     + [x] DXTn
     + [ ] ARGB4444
     + [ ] ARGB1555
