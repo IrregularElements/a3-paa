@@ -79,6 +79,15 @@ paatool encode sky_clear_sky.png sky_clear_sky.paa # Convert image to PAA
   + [ ] Texture filter language (bitfilt)
   + [ ] Procedural texture generation language (PROCTAGG)
   + [ ] LZSS checksum
++ [ ] `paatool`:
+  + [x] Encode and decode PAAs
+  + [x] Show PAA info
+  + [ ] Convert DDS to PAA
+    + [x] DXTn
+    + [ ] ARGB4444
+    + [ ] ARGB1555
+    + [ ] ARGB8888
+    + [ ] AI88
 
 [Biki]: https://community.bistudio.com/wiki/PAA_File_Format
 [PMC Editing Wiki]: https://pmc.editing.wiki/doku.php?id=arma:file_formats:paa

@@ -6,6 +6,7 @@ use anyhow::{Context, Result as AnyhowResult};
 mod encode;
 mod decode;
 mod info;
+mod dds2paa;
 
 
 fn construct_app() -> clap::Command<'static> {
@@ -29,6 +30,11 @@ fn construct_app() -> clap::Command<'static> {
 			.arg(clap::arg!(mipmap: -m "1-based mipmap index").default_value("1"))
 			.arg(clap::arg!(paa: <PAA> "PAA input file"))
 			.arg(clap::arg!(png: <PNG> "PNG output path")))
+		.subcommand(clap::Command::new("dds2paa")
+			.about("Convert a DirectX DDS file to PAA")
+			.arg(clap::arg!(layer: -l "1-based array layer index").default_value("1"))
+			.arg(clap::arg!(dds: <DDS> "DDS input file"))
+			.arg(clap::arg!(paa: <PAA> "PAA output path")))
 		.subcommand(clap::Command::new("info")
 			.about("Parse a PAA file and log details")
 			.arg(clap::arg!(brief: -b --brief "Do not prepend file name to output").takes_value(false))
@@ -62,6 +68,10 @@ fn paatool() -> AnyhowResult<()> {
 
 		Some(("info", matches)) => {
 			info::command_info(matches)
+		},
+
+		Some(("dds2paa", matches)) => {
+			dds2paa::command_dds2paa(matches)
 		},
 
 		Some((&_, _)) => unreachable!(),
