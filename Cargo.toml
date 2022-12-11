@@ -3,7 +3,7 @@ edition = "2021"
 name = "a3-paa"
 version = "0.0.1-dev"
 description = "Read and write the Bohemia Interactive PAA image format"
-rust-version = "1.56"
+rust-version = "1.63"
 
 [features]
 default = []
@@ -33,7 +33,7 @@ git = "https://github.com/IrregularElements/bohemia-compression.git"
 rev = "23afce3e4e3a55eb448380e9a60a35bf1a1afd1b"
 
 [dev-dependencies]
-anyhow = { version = "1.0.55", features = ["backtrace"] }
+anyhow = { version = "1.0.61", features = ["backtrace"] }
 clap = { version = "3.1.5", features = ["cargo"] }
 tracing = "0.1.35"
 tracing-subscriber = "0.3.11"
