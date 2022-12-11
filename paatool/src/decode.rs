@@ -1,8 +1,8 @@
 use a3_paa::*;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result as AnyhowResult};
 
 
-pub fn command_decode(matches: &clap::ArgMatches) -> Result<()> {
+pub fn command_decode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	let paa_path = matches.value_of("paa").expect("PAA required");
 	let png_path = matches.value_of("png").expect("PNG required");
 	let mip_idx_str = matches.value_of("mipmap").unwrap_or("1");

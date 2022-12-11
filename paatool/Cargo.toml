@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "paatool"
+version = "1.0.0"
+description = "Read and write the Bohemia Interactive PAA image format"
+rust-version = "1.63"
+
+[dependencies]
+a3-paa = { path = "../a3-paa" }
+anyhow = { version = "1.0.61", features = ["backtrace"] }
+clap = { version = "3.1.5", features = ["cargo"] }
+image = "0.24.1"
+tap = "1.0.1"
+tracing = "0.1.35"
+tracing-subscriber = "0.3.11"
+wild = "2.0.4"

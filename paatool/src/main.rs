@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result as AnyhowResult};
 
 mod encode;
 mod decode;
@@ -37,7 +37,7 @@ fn construct_app() -> clap::Command<'static> {
 }
 
 
-fn paatool() -> Result<()> {
+fn paatool() -> AnyhowResult<()> {
 	let matches = construct_app().get_matches_from(wild::args());
 	let loglevel_str = matches.value_of("loglevel")
 		.unwrap_or("Info");
@@ -74,7 +74,7 @@ fn paatool() -> Result<()> {
 }
 
 
-fn main() -> Result<()> {
+fn main() -> AnyhowResult<()> {
 	match paatool() {
 		Ok(()) => Ok(()),
 		Err(e) => { tracing::error!("{:?}", e); Ok(()) },

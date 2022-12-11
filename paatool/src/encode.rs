@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
 use a3_paa::*;
-use anyhow::{Context, anyhow};
+use anyhow::{Context, anyhow, Result as AnyhowResult};
 use tap::prelude::*;
 
 
-pub fn command_encode(matches: &clap::ArgMatches) -> anyhow::Result<()> {
+pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	let img_path = matches.value_of("img").expect("IMG required");
 	let paa_path = matches.value_of("paa").expect("PAA required");
 

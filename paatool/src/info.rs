@@ -1,8 +1,8 @@
 use a3_paa::*;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result as AnyhowResult};
 
 
-pub fn command_info(matches: &clap::ArgMatches) -> Result<()> {
+pub fn command_info(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	let brief = matches.is_present("brief");
 	let serialize = matches.is_present("serialize_back");
 
@@ -20,7 +20,7 @@ pub fn command_info(matches: &clap::ArgMatches) -> Result<()> {
 }
 
 
-fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> Result<()> {
+fn paa_path_info(path: &str, brief: bool, serialize_back: bool) -> AnyhowResult<()> {
 	let brief_prefix = if brief {
 		"".to_string()
 	}

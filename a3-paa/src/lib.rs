@@ -6,7 +6,7 @@
 #![allow(clippy::must_use_candidate)]
 
 
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 
 
 mod macros;

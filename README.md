@@ -44,13 +44,14 @@ fn main() -> anyhow::Result<()> {
 ### `paatool`
 To install, run:
 ```sh
-cargo install --force --git=https://github.com/IrregularElements/a3-paa --example=paatool a3-paa
+cargo install --force --git=https://github.com/IrregularElements/a3-paa paatool
 ```
 
 ```sh
 paatool --help
 paatool info sky_clear_sky.paa # Show information about PAA
-paatool paa2png sky_clear_sky.paa sky_clear_sky.png # Convert PAA to PNG
+paatool decode sky_clear_sky.paa sky_clear_sky.png # Convert PAA to PNG
+paatool encode sky_clear_sky.png sky_clear_sky.paa # Convert image to PAA
 ```
 
 ### Roadmap
