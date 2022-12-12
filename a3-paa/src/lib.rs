@@ -118,10 +118,6 @@ pub enum PaaError {
 	#[display(fmt = "While encoding, received a mipmap with one or both dimensions larger than 32768, or overflowing a length integer")]
 	MipmapTooLarge,
 
-	/// Mipmap dimensions not multiple of 2 or less than 4.
-	#[display(fmt = "DXTn mipmap dimensions not multiple of 2 or less than 4")]
-	UnexpectedMipmapDimensions,
-
 	/// Uncompressed mipmap data is not of the same size as computed by
 	/// [`PaaType::predict_size`].  Enum members are width, height and
 	/// [`predict_size`][PaaType::predict_size] result.

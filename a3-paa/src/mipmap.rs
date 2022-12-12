@@ -188,8 +188,6 @@ impl PaaMipmap {
 
 	/// # Errors
 	/// - [`MipmapTooLarge`]: Mipmap dimension equals to or is larger than 32768.
-	/// - [`UnexpectedMipmapDimensions`]: Attempted to encode a DXTn texture
-	///   that is too small or not a power of 2.
 	/// - [`UnexpectedMipmapDataSize`]: [`PaaMipmap::data.len()`] does not equal
 	///   [`PaaType::predict_size`].
 	///
@@ -206,13 +204,6 @@ impl PaaMipmap {
 
 		if self.width >= 32768 || self.height >= 32768 {
 			return Err(MipmapTooLarge);
-		};
-
-		let non_power_of_2 = self.width.count_ones() > 1 || self.height.count_ones() > 1;
-		let too_small = self.width < 4 || self.height < 4;
-
-		if self.paatype.is_dxtn() && (non_power_of_2 || too_small) {
-			return Err(UnexpectedMipmapDimensions);
 		};
 
 		let mut width = self.width;
