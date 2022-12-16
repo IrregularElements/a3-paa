@@ -15,7 +15,7 @@ bstr = "0.2.17"
 
 [dependencies.a3-paa]
 path = "../a3-paa"
-features = ["fuzz"]
+features = ["arbitrary"]
 
 # Prevent this from interfering with workspaces
 [workspace]

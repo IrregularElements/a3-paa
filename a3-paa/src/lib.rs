@@ -27,7 +27,7 @@ use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
-#[cfg(feature = "fuzz")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
+#[cfg(feature = "arbitrary")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
 use bstr::BString;
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 #[cfg(test)] use byteorder::BigEndian;
@@ -372,7 +372,7 @@ impl PaaImage {
 
 /// Bitmap encoding used by all [mipmaps][`PaaImage::mipmaps`] of a given PAA
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromStr, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 #[enumeration(case_insensitive)]
 #[deku(type = "u16", endian = "little")]
 pub enum PaaType {
@@ -820,7 +820,7 @@ impl Tagg {
 }
 
 
-#[cfg(feature = "fuzz")]
+#[cfg(feature = "arbitrary")]
 impl<'a> Arbitrary<'a> for Tagg {
 	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
 		use Tagg::*;
@@ -983,7 +983,7 @@ pub struct Bgr888Pixel {
 
 /// The color data used in AVGCTAGG and MAXCTAGG; its byte layout is B:G:R:A
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 pub struct Bgra8888Pixel {
 	#[allow(missing_docs)]
 	pub b: u8,
@@ -1018,7 +1018,7 @@ impl From<image::Rgba<u8>> for Bgra8888Pixel {
 
 /// Alpha interpolation algorithm used when the texture is rendered
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 #[deku(type = "u8")]
 pub enum Transparency {
 	/// Transparency disabled
@@ -1216,7 +1216,7 @@ impl ArgbSwizzle {
 /// computed from the original image's negated red channel value, the PAA red
 /// channel is filled with all ones, etc.
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 #[deku(ctx = "tgt: ChannelSwizzleId")]
 #[display(fmt = "<{}={}>", target, data)]
 pub struct ChannelSwizzle {
@@ -1319,7 +1319,7 @@ impl ChannelSwizzle {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, FromStr, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 #[enumeration(case_insensitive)]
 #[deku(type = "u8", bits = "2")]
 #[repr(usize)]
@@ -1430,7 +1430,7 @@ impl std::fmt::Display for ChannelSwizzleData {
 }
 
 
-#[cfg(feature = "fuzz")]
+#[cfg(feature = "arbitrary")]
 impl<'a> Arbitrary<'a> for ChannelSwizzleData {
 	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
 		let variant: usize = input.int_in_range(1..=2)?;
@@ -1457,7 +1457,7 @@ impl<'a> Arbitrary<'a> for ChannelSwizzleData {
 
 /// The value (ones or zeroes) to fill a channel with while swizzling
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 #[deku(type = "u8", bits = "2")]
 #[repr(u8)]
 pub enum ChannelSwizzleFill {
@@ -1494,7 +1494,7 @@ pub struct TextureMacro {
 }
 
 
-#[cfg(feature = "fuzz")]
+#[cfg(feature = "arbitrary")]
 impl<'a> Arbitrary<'a> for TextureMacro {
 	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
 		Ok(TextureMacro { text: BString::from(<Vec<u8> as Arbitrary>::arbitrary(input)?) })

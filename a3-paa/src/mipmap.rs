@@ -3,7 +3,7 @@ use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
 use std::default::Default;
 
-#[cfg(feature = "fuzz")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
+#[cfg(feature = "arbitrary")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
 use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 use image::RgbaImage;
 use texpresso::Format as TextureFormat;
@@ -400,7 +400,7 @@ impl Default for PaaMipmap {
 }
 
 
-#[cfg(feature = "fuzz")]
+#[cfg(feature = "arbitrary")]
 impl<'a> Arbitrary<'a> for PaaMipmap {
 	fn arbitrary(input: &mut Unstructured) -> ArbitraryResult<Self> {
 		use PaaType::*;
@@ -456,7 +456,7 @@ impl<'a> Arbitrary<'a> for PaaMipmap {
 
 /// The algorithm compressing the data of a given mipmap
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 pub enum PaaMipmapCompression {
 	/// Data is stored as-is.
 	Uncompressed,
