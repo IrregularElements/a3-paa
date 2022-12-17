@@ -58,14 +58,12 @@ impl PaaEncoder {
 
 		let paatype = self.settings.format;
 
-		let mipmap_cutoff = if paatype.is_dxtn() { 4 } else { 1 };
-
 		let avgc_tagg = Tagg::Avgc { rgba: avgc };
 		let maxc_tagg = Tagg::Maxc { rgba: maxc };
 		let taggs = vec![avgc_tagg, maxc_tagg];
 
 		let mut mipmaps = imageops
-			::construct_mipmap_series(img, mipmap_cutoff, image::imageops::FilterType::Triangle)
+			::construct_mipmap_series(img, 1, image::imageops::FilterType::Triangle)
 			.iter()
 			.map(|i| PaaMipmap::encode(paatype, i))
 			.collect::<Vec<PaaResult<PaaMipmap>>>();
