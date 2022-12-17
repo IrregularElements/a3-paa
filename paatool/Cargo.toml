@@ -8,6 +8,7 @@ rust-version = "1.63"
 [dependencies]
 a3-paa = { path = "../a3-paa" }
 anyhow = { version = "1.0.61", features = ["backtrace"] }
+byteorder = "1.4.3"
 clap = { version = "3.1.5", features = ["cargo"] }
 ddsfile = "0.5.1"
 image = "0.24.1"
