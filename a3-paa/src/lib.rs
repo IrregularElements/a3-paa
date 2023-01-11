@@ -124,9 +124,9 @@ pub enum PaaError {
 
 	/// Uncompressed mipmap data is not of the same size as computed by
 	/// [`PaaType::predict_size`].  Enum members are width, height and
-	/// [`predict_size`][PaaType::predict_size] result.
+	/// actual size.
 	#[error(ignore)]
-	#[display(fmt = "Uncompressed mipmap data is not the same size as computed from dimensions (predict_size({}x{}) = {})", _0, _1, _2)]
+	#[display(fmt = "Uncompressed mipmap data is not the same size as computed from dimensions (predict_size({}x{}) != {})", _0, _1, _2)]
 	UnexpectedMipmapDataSize(u16, u16, usize),
 
 	/// The [`PaaImage`] passed to [`PaaImage::to_bytes`] contained mipmap errors.
