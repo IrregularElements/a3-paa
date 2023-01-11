@@ -436,20 +436,30 @@ impl PaaType {
 	/// Calculate the size in bytes of uncompressed mipmap data from its width
 	/// and height in pixels.
 	pub const fn predict_size(&self, width: u16, height: u16) -> usize {
+		const fn next_multiple_of(n: usize, rhs: usize) -> usize {
+			match n % rhs {
+				0 => n,
+				r => n + (rhs - r)
+			}
+		}
+
 		use PaaType::*;
 
 		const_assert!(std::mem::size_of::<usize>() >= 4);
 
-		let mut result = width as usize * height as usize;
+		let ws = width as usize;
+		let hs = height as usize;
+		let ws4 = next_multiple_of(ws, 4);
+		let hs4 = next_multiple_of(hs, 4);
+
 
 		match self {
-			Dxt1 => { result /= 2 },
-			IndexPalette | Dxt2 | Dxt3 | Dxt4 | Dxt5 => (),
-			Argb4444 | Argb1555 | Ai88 => { result *= 2 },
-			Argb8888 => { result *= 4 },
-		};
-
-		result
+			t if t.is_dxtn() => ws4 * hs4 / (if matches!(t, Dxt1) { 2 } else { 1 }),
+			IndexPalette => ws * hs,
+			Argb4444 | Argb1555 | Ai88 => ws * hs * 2,
+			Argb8888 => ws * hs * 4,
+			_ => unreachable!(),
+		}
 	}
 
 
