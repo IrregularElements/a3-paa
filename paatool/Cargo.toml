@@ -12,6 +12,7 @@ byteorder = "1.4.3"
 clap = { version = "3.1.5", features = ["cargo"] }
 ddsfile = "0.5.1"
 image = "0.24.1"
+steamlocate = "1.1.0"
 tap = "1.0.1"
 tracing = "0.1.35"
 tracing-subscriber = "0.3.11"

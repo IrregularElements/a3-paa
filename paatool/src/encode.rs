@@ -5,6 +5,9 @@ use anyhow::{Context, anyhow, Result as AnyhowResult};
 use tap::prelude::*;
 
 
+const ARMA3_TOOLS_STEAM_APPID: u32 = 233880;
+
+
 pub fn command_encode(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	let img_path = matches.value_of("img").expect("IMG required");
 	let paa_path = matches.value_of("paa").expect("PAA required");
@@ -91,14 +94,12 @@ fn suggest_hints_paths() -> impl Iterator<Item=PathBuf> {
 		// [TODO]: Use Arma 3 registry key
 		parent_dirs.push(PathBuf::from(r"P:\"));
 		parent_dirs.push(PathBuf::from(r"P:\TexView2"));
-
-		for drive in ["C", "D", "E"] {
-			for root_dir in [r"Program Files (x86)\Steam", "Steam"] {
-				let path_string = format!(r"{drive}:\{root_dir}\steamapps\common\Arma 3 Tools\TexView2");
-				parent_dirs.push(PathBuf::from(path_string));
-			};
-		};
 	};
+
+	steamlocate::SteamDir::locate()
+		.and_then(|mut d| d.app(&ARMA3_TOOLS_STEAM_APPID).cloned())
+		.map(|a| a.path)
+		.tap_some(|p| parent_dirs.push(p.join("TexView2")));
 
 	parent_dirs
 		.into_iter()
