@@ -2,7 +2,7 @@ use std::fs::File;
 
 use a3_paa::{PaaType, PaaError, PaaResult, PaaMipmap, PaaImage};
 use anyhow::{Context, Error as AnyhowError, Result as AnyhowResult};
-use ddsfile::{Dds, D3DFormat};
+use ddsfile::{Dds, D3DFormat, DxgiFormat};
 use tap::prelude::*;
 
 
@@ -27,12 +27,12 @@ pub fn command_dds2paa(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	tracing::info!("{dds_path}: {d3dfmt}/{dxgifmt}, {w}x{h}, {levels} layers, {mips} mipmaps");
 
 	#[allow(deprecated)]
-	let paatype = match dds.get_d3d_format() {
-		Some(D3DFormat::DXT1) => PaaType::Dxt1,
-		Some(D3DFormat::DXT2) => PaaType::Dxt2,
-		Some(D3DFormat::DXT3) => PaaType::Dxt3,
-		Some(D3DFormat::DXT4) => PaaType::Dxt4,
-		Some(D3DFormat::DXT5) => PaaType::Dxt5,
+	let paatype = match (dds.get_d3d_format(), dds.get_dxgi_format()) {
+		(Some(D3DFormat::DXT1), _) | (_, Some(DxgiFormat::BC1_UNorm_sRGB)) => PaaType::Dxt1,
+		(Some(D3DFormat::DXT2), _) => PaaType::Dxt2,
+		(Some(D3DFormat::DXT3), _) | (_, Some(DxgiFormat::BC2_UNorm_sRGB)) => PaaType::Dxt3,
+		(Some(D3DFormat::DXT4), _) => PaaType::Dxt4,
+		(Some(D3DFormat::DXT5), _) | (_, Some(DxgiFormat::BC3_UNorm_sRGB)) => PaaType::Dxt5,
 		f => anyhow::bail!("DDS to PAA conversion not implemented for this D3D format: {f:?}"),
 	};
 
