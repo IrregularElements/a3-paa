@@ -105,6 +105,10 @@ pub enum PaaError {
 	#[display(fmt = "Read an empty mipmap")]
 	EmptyMipmap,
 
+	/// Attempted to encode a DXTn mipmap with dimensions not multiple of 4.
+	#[display(fmt = "DXTn mipmap dimensions not multiple of 4: {}x{}", _0, _1)]
+	DxtMipmapDimensionsNotMultipleOf4(u16, u16),
+
 	/// Mipmap start offset (as indicated in the file) is beyond EOF.
 	#[display(fmt = "Mipmap start offset as indicated in metadata is beyond EOF")]
 	MipmapOffsetBeyondEof,

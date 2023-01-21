@@ -1,7 +1,7 @@
 use std::fs::File;
 
-use a3_paa::{PaaType, PaaResult, PaaMipmap, PaaImage};
-use anyhow::{Context, Result as AnyhowResult};
+use a3_paa::{PaaType, PaaError, PaaResult, PaaMipmap, PaaImage};
+use anyhow::{Context, Error as AnyhowError, Result as AnyhowResult};
 use ddsfile::{Dds, D3DFormat};
 use tap::prelude::*;
 
@@ -45,6 +45,16 @@ pub fn command_dds2paa(matches: &clap::ArgMatches) -> AnyhowResult<()> {
 	let mut mipmaps: Vec<PaaResult<PaaMipmap>> = vec![];
 
 	for i in 0..mips {
+		if width < 4 || height < 4 {
+			tracing::info!("One or both DXT dimensions less than 4, stopping at previous mipmap: {width}x{height}");
+			break;
+		};
+
+		if width % 4 != 0 || height % 4 != 0 {
+			let err = PaaError::DxtMipmapDimensionsNotMultipleOf4(width, height);
+			return AnyhowResult::Err(AnyhowError::new(err));
+		};
+
 		let compression = PaaMipmap::suggest_compression(paatype, width, height);
 		let left = cursor;
 		let right = cursor + mip_size;

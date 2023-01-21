@@ -356,6 +356,10 @@ impl PaaMipmap {
 					_ => unreachable!(),
 				};
 
+				if width % 4 != 0 || height % 4 != 0 {
+					return Err(DxtMipmapDimensionsNotMultipleOf4(width, height));
+				};
+
 				let mut data: Vec<u8> = vec![0; textureformat.compressed_size(width.into(), height.into())];
 				let params = texpresso::Params { algorithm: texpresso::Algorithm::IterativeClusterFit, ..Default::default() };
 				textureformat.compress(image.as_raw(), width.into(), height.into(), params, &mut data);
