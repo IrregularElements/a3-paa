@@ -6,9 +6,9 @@ use crate::{PaaResult, PaaType, PaaImage, Tagg, PaaMipmap, ArgbSwizzle};
 #[cfg(doc)] use crate::PaaError::*;
 
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::ops::Deref;
 
-use enum_utils::FromStr;
 use image::RgbaImage;
 
 
@@ -126,8 +126,7 @@ impl std::fmt::Display for TextureEncodingSettings {
 
 /// `[TODO]`
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy, FromStr)]
-#[enumeration(case_insensitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureMipmapFilter {
 	AlphaNoise,
 	FadeOut,
@@ -139,12 +138,49 @@ pub enum TextureMipmapFilter {
 }
 
 
+impl FromStr for TextureMipmapFilter {
+	type Err = ();
+
+	fn from_str(input: &str) -> Result<Self, <Self as FromStr>::Err> {
+		use TextureMipmapFilter::*;
+
+		let normalized = input.to_lowercase();
+
+		match normalized.as_str() {
+			"alphanoise" => Ok(AlphaNoise),
+			"fadeout" => Ok(FadeOut),
+			"addalphanoise" => Ok(AddAlphaNoise),
+			"normalizenormalmap" => Ok(NormalizeNormalMap),
+			"normalizenormalmapalpha" => Ok(NormalizeNormalMapAlpha),
+			"normalizenormalmapnoise" => Ok(NormalizeNormalMapNoise),
+			"normalizenormalmapfade" => Ok(NormalizeNormalMapFade),
+			_ => Err(()),
+		}
+	}
+}
+
+
 /// `[TODO]`
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy, FromStr)]
-#[enumeration(case_insensitive)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureErrorMetrics {
 	Distance,
+}
+
+
+impl FromStr for TextureErrorMetrics {
+	type Err = ();
+
+	fn from_str(input: &str) -> Result<Self, <Self as FromStr>::Err> {
+		use TextureErrorMetrics::*;
+
+		let normalized = input.to_lowercase();
+
+		match normalized.as_str() {
+			"distance" => Ok(Distance),
+			_ => Err(()),
+		}
+	}
 }
 
 

@@ -25,6 +25,7 @@ pub use encode::*;
 use std::fmt::Debug;
 use std::io::{Read, Seek, SeekFrom, Cursor};
 use std::iter::Extend;
+use std::str::FromStr;
 use std::default::Default;
 
 #[cfg(feature = "arbitrary")] use arbitrary::{Arbitrary, Unstructured, Result as ArbitraryResult};
@@ -33,7 +34,6 @@ use byteorder::{LittleEndian, ByteOrder, ReadBytesExt};
 #[cfg(test)] use byteorder::BigEndian;
 use deku::prelude::*;
 use derive_more::{Display, Error};
-use enum_utils::FromStr;
 use image::{RgbaImage, Pixel};
 use static_assertions::const_assert;
 #[cfg(test)] use static_assertions::assert_impl_all;
@@ -375,9 +375,8 @@ impl PaaImage {
 
 
 /// Bitmap encoding used by all [mipmaps][`PaaImage::mipmaps`] of a given PAA
-#[derive(Debug, Clone, Copy, PartialEq, Eq, FromStr, DekuRead, DekuWrite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
-#[enumeration(case_insensitive)]
 #[deku(type = "u16", endian = "little")]
 pub enum PaaType {
 	// See `int __stdcall sub_4276E0(void *Block, int)` (ImageToPAA v1.0.0.3).
@@ -432,6 +431,31 @@ impl Default for PaaType {
 	/// Returns [`Dxt5`][`PaaType::Dxt5`].
 	fn default() -> Self {
 		PaaType::Dxt5
+	}
+}
+
+
+impl FromStr for PaaType {
+	type Err = ();
+
+	fn from_str(input: &str) -> Result<Self, <Self as FromStr>::Err> {
+		use PaaType::*;
+
+		let normalized = input.to_lowercase();
+
+		match normalized.as_str() {
+			"indexpalette" => Ok(IndexPalette),
+			"ai88" => Ok(Ai88),
+			"argb1555" => Ok(Argb1555),
+			"argb4444" => Ok(Argb4444),
+			"argb8888" => Ok(Argb8888),
+			"dxt1" => Ok(Dxt1),
+			"dxt2" => Ok(Dxt2),
+			"dxt3" => Ok(Dxt3),
+			"dxt4" => Ok(Dxt4),
+			"dxt5" => Ok(Dxt5),
+			_ => Err(()),
+		}
 	}
 }
 
@@ -1332,29 +1356,43 @@ impl ChannelSwizzle {
 }
 
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, FromStr, DekuRead, DekuWrite)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite)]
 #[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
-#[enumeration(case_insensitive)]
 #[deku(type = "u8", bits = "2")]
 #[repr(usize)]
 #[allow(missing_docs)]
 pub enum ChannelSwizzleId {
 	#[display(fmt = "a")]
-	#[enumeration(rename = "A")]
 	#[deku(id = "0b00")]
 	Alpha = 0x03,
 	#[display(fmt = "r")]
-	#[enumeration(rename = "R")]
 	#[deku(id = "0b01")]
 	Red = 0x00,
 	#[display(fmt = "g")]
-	#[enumeration(rename = "G")]
 	#[deku(id = "0b10")]
 	Green = 0x01,
 	#[display(fmt = "b")]
-	#[enumeration(rename = "B")]
 	#[deku(id = "0b11")]
 	Blue = 0x02,
+}
+
+
+impl FromStr for ChannelSwizzleId {
+	type Err = ();
+
+	fn from_str(input: &str) -> Result<Self, <Self as FromStr>::Err> {
+		use ChannelSwizzleId::*;
+
+		let normalized = input.to_lowercase();
+
+		match normalized.as_str() {
+			"a" => Ok(Alpha),
+			"r" => Ok(Red),
+			"g" => Ok(Green),
+			"b" => Ok(Blue),
+			_ => Err(()),
+		}
+	}
 }
 
 

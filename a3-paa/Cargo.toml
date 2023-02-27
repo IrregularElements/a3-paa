@@ -14,7 +14,6 @@ bstr = "0.2.17" # [TODO] PROCTAGG text
 byteorder = "1.4.3" # Read little-endian PAA data
 deku = "0.15.0" # derive(DekuRead, DekuWrite) for PAA structures
 derive_more = "0.99.17" # derive(Display, Error)
-enum-utils = "0.1.2" # derive(FromStr)
 image = "0.24.1" # Read and write common image formats
 minilzo-rs = "0.6.0" # Read and write LZO-compressed DXTn textures
 nom = "7.1.1" # Parse TexConvert.cfg
